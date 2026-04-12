@@ -1,3 +1,4 @@
+HEAD
 # ApplianSys
 
 ApplianSys is a simple appliance storefront UI with a home/search landing page,
@@ -111,3 +112,6 @@ Force-update them to the latest versions:
 - Notes: messages are stored in component state only (no persistence)
 
 See `DOCUMENTATION.md` for deeper architecture details and workflow notes.
+
+# ApplianSys-UI-
+ f0d9498ca4ac42ee41f7e75fcedadb6760c025fd
