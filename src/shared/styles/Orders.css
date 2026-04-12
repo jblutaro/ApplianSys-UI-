@@ -1,0 +1,235 @@
+/* ── Orders page ── */
+.orders-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px var(--page-margin, 5%);
+}
+
+.orders-page__title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0 0 28px;
+}
+
+/* Toolbar: tabs + search */
+.orders-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+}
+
+.orders-tabs {
+    display: flex;
+    gap: 0;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.orders-tab {
+    padding: 9px 20px;
+    border: none;
+    background: var(--bg-white);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+    cursor: pointer;
+    border-right: 1px solid rgba(0,0,0,0.1);
+    transition: background 0.15s, color 0.15s;
+}
+
+.orders-tab:last-child {
+    border-right: none;
+}
+
+.orders-tab--active {
+    background: var(--primary-gold);
+    color: white;
+    font-weight: 700;
+}
+
+.orders-tab:not(.orders-tab--active):hover {
+    background: #f5f5f5;
+}
+
+.orders-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    padding: 9px 14px;
+    background: var(--bg-white);
+    flex: 1;
+    max-width: 360px;
+}
+
+.orders-search {
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: var(--text-main);
+    background: transparent;
+    width: 100%;
+}
+
+.orders-search::placeholder {
+    color: #aaa;
+}
+
+/* Empty state */
+.orders-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 60px 0;
+    color: #ccc;
+}
+
+.orders-empty__text {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Order cards */
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-card {
+    border: 1px solid rgba(0,0,0,0.09);
+    border-radius: 14px;
+    background: var(--bg-white);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+}
+
+.order-card__header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    flex-wrap: wrap;
+}
+
+.order-card__id {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.order-card__date {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.order-card__status {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+/* Items inside a card */
+.order-card__items {
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.order-item__img-placeholder {
+    width: 80px;
+    height: 80px;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 10px;
+    background: #f5f5f5;
+    flex-shrink: 0;
+}
+
+.order-item__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.order-item__name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+    line-height: 1.4;
+}
+
+.order-item__qty {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.order-item__price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #c0392b;
+    flex-shrink: 0;
+}
+
+/* Footer */
+.order-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 16px 24px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+    flex-wrap: wrap;
+}
+
+.order-card__total {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-right: auto;
+}
+
+.order-card__total-amount {
+    color: #c0392b;
+    font-size: 20px;
+}
+
+.order-card__actions {
+    display: flex;
+    gap: 10px;
+}
+
+.order-card__btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.order-card__btn--outline {
+    border: 1.5px solid rgba(0,0,0,0.2);
+    background: var(--bg-white);
+    color: var(--text-main);
+}
+
+.order-card__btn--outline:hover {
+    background: #f5f5f5;
+}
