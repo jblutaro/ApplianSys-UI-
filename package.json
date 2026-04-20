@@ -6,7 +6,11 @@
   "author": "Your Name",
   "license": "MIT",
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "start": "vite --open",
+    "start:frontend": "vite --open",
+    "start:backend": "npm --prefix backend run dev",
+    "install:backend": "npm --prefix backend install",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"./**/*.ts\"  \"./**/*.tsx\"  \"./**/*.css\" \"./**/*.html\"",
     "build": "tsc && vite build",

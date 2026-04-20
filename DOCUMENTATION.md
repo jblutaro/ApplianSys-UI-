@@ -1,154 +1,250 @@
-# Project Overview
+# Project Documentation
 
-- Purpose: a simple appliance storefront UI with a home/search landing page, About page, and Cart page.
-- High-level features:
+## Overview
 
-  - Search (home): hero banner and category sections with a search input in the header.
-  - About: static informational page.
-  - Cart: static cart placeholder page.
-  - Chatbot: floating ChatGPT assistant for product and category questions.
+ApplianSys is split into two runtime layers:
 
-# Tech Stack
+- Frontend: a React + Vite application in `src/`
+- Backend: an Express + TypeScript API in `backend/`
 
-- React
-- TypeScript
-- Vite
-- Redux Toolkit
-- React-Redux
+The storefront UI can render without the backend for some routes, but the admin area depends on the backend and database being available.
 
-# Folder Structure
+## Runtime Architecture
 
--`src/`: application source code
+### Frontend
 
-  -`src/app/`: app bootstrap (providers, routing, entry point)
+- Entry: `src/app/main.tsx`
+- Providers: `src/app/providers/AppProviders.tsx`
+- App shell and routes: `src/app/App.tsx`
+- Feature pages: `src/features/*/pages`
+- Shared assets/components: `src/shared/`
 
-  -`src/app/store/`: Redux store setup and typed hooks
+### Backend
 
-  -`src/features/`: feature modules and page-level components
+- Server entry: `backend/src/server.ts`
+- Express app setup: `backend/src/app.ts`
+- API router: `backend/src/routes/index.ts`
+- Admin routes: `backend/src/routes/admin.ts`
+- Environment config: `backend/src/config/env.ts`
+- Database pool: `backend/src/config/database.ts`
 
-  -`src/shared/`: shared styles, assets, and components
+### Database
 
-  -`src/theme/`: MUI theme configuration
+- Local SQL assets live in `database/`
+- The backend uses MySQL via `mysql2`
+- The default local database name in examples is `appliansys_db`
 
-  -`src/vite-env.d.ts`: Vite TypeScript types
+## Environment Configuration
 
--`public/`: static assets served as-is (referenced by `index.html`)
+Two separate `.env` files are expected.
 
--`redux/`: not present in the current layout; Redux lives in `src/app/store/`
+### 1. Root `.env`
 
-# Application Flow
+Purpose:
 
--`index.html` loads `src/app/main.tsx`.
+- Vite environment values
+- Firebase web config
+- Admin email allowlist
+- Dev proxy target for `/api`
 
--`src/app/main.tsx` renders `AppProviders` and then `src/app/App.tsx`.
+Source template:
 
--`src/app/App.tsx` defines routes and renders feature pages.
+- `.env.example`
 
--`src/app/App.tsx` also renders the `ChatGPTBot` floating assistant.
+Expected keys:
 
-- State flow: components dispatch actions -> reducers update state -> components read state via selectors.
-
-# Redux Architecture
-
-- Store setup: `src/app/store/index.ts`
-
-  -`configureStore` with the root reducer.
-
-  - Types: `RootState`, `AppDispatch`, `AppThunk`.
-- Typed hooks: `src/app/store/hooks.ts` (re-exported from `@/app/store`)
-
-  -`useAppDispatch`
-
-  -`useAppSelector`
-
-```ts
-
-import { useAppDispatch, useAppSelector } from"@/app/store";
-
-
-constdispatch = useAppDispatch();
-
-constvalue = useAppSelector((state) =>state.someSlice?.value);
-
+```env
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+VITE_FIREBASE_APP_ID=your-app-id
+VITE_ADMIN_EMAILS=admin@example.com
+VITE_API_PROXY_TARGET=http://127.0.0.1:4000
 ```
 
-- To add a feature slice later:
+Guidance:
 
-  - Create the slice under `src/features/<feature>/slice/`.
-  - Add it to the root reducer in `src/app/store/index.ts`.
+- All `VITE_*` variables are exposed to the frontend bundle.
+- Do not place private server-only secrets in the root `.env`.
+- Restart Vite after editing these values.
 
-# Components & Pages
+### 2. `backend/.env`
 
--`src/app/App.tsx`: main layout and route definitions.
+Purpose:
 
--`src/features/search/pages/SearchPage.tsx`: home/search landing page UI.
+- Backend port
+- MySQL connection settings
 
--`src/features/about/pages/AboutPage.tsx`: About page.
+Source template:
 
--`src/features/cart/pages/CartPage.tsx`: Cart page.
+- `backend/.env.example`
 
--`src/shared/component/ChatGPTBot.tsx`: floating chatbot widget powered by the OpenAI API.
+Expected keys:
 
-# Chatbot (ChatGPT)
-
-- Component: `src/shared/component/ChatGPTBot.tsx`, rendered in `src/app/App.tsx`.
-- UI: floating button toggles a panel with conversation history, clear action, and a text input.
-- API: calls `https://api.openai.com/v1/chat/completions` with a system prompt for the ApplianSys storefront.
-- Messages: stored in component state only (no persistence).
-- Errors: missing key or network issues show user-facing fallback messages.
-
-## Chatbot Environment Variables
-
-```bash
-
-VITE_OPENAI_API_KEY=your_openai_api_key
-
-VITE_OPENAI_MODEL=gpt-4o-mini
-
+```env
+PORT=4000
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=appliansys_db
+DB_USER=your-db-user
+DB_PASSWORD=your-db-password
 ```
 
--`VITE_OPENAI_API_KEY` is required for requests.
+Guidance:
 
--`VITE_OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
+- These values remain server-side and must stay local.
+- Use your actual local database credentials.
+- Do not commit populated backend credentials.
 
-# Styling & Assets
+## Development Workflow
 
-- Global styles: `src/shared/styles/index.css`.
-- App styles: `src/shared/styles/App.css`.
-- Theme: `src/theme/index.ts` (MUI theme used in `AppProviders`).
-- Images:
+### Install
 
-  -`src/shared/assets/images/category.png` imported in `src/app/App.tsx`.
-
-  -`src/shared/assets/images/Search.png` used as a CSS background in `src/shared/styles/App.css`.
-- Chatbot styles: `src/shared/styles/ChatBot.css`.
-
-# Development Setup
+Frontend:
 
 ```bash
-
 npm install
-
-npm run start
-
-npm run build
-
-npm run preview
-
-npm run lint
-
 ```
 
-# Best Practices
+Backend:
 
-- Keep page-level UI in `src/features/<feature>/pages/`.
-- Put shared styles/assets in `src/shared/` to avoid duplication.
-- Use `useAppDispatch` and `useAppSelector` from `@/app/store`.
-- Wire reducers only in `src/app/store/index.ts`.
-- Avoid cross-feature imports; depend only on `shared/` or the feature itself.
+```bash
+npm run install:backend
+```
 
-# Future Improvements (Optional)
+### Run
 
-- Add feature slices under `src/features/*/slice` and compose them in the root reducer.
-- Extract reusable UI into `src/shared/components/`.
-- Add shared hooks/services for side effects or data fetching.
+Both services together:
+
+```bash
+npm run dev
+```
+
+Frontend only:
+
+```bash
+npm run start
+```
+
+Backend only:
+
+```bash
+npm run start:backend
+```
+
+### Build / Quality
+
+```bash
+npm run build
+npm run lint
+npm run format
+```
+
+## Request Flow
+
+During development:
+
+1. The browser calls a frontend route or `/api/...`
+2. Vite serves frontend assets
+3. Vite proxies `/api` calls to `VITE_API_PROXY_TARGET`
+4. The Express backend handles the request
+5. Admin routes may read from MySQL and local JSON settings storage
+
+Important consequence:
+
+- If the backend is not running, frontend admin requests fail with proxy connection errors.
+- If database credentials are wrong, backend endpoints can return `500`.
+
+## Admin Area
+
+The admin UI fetches data from backend routes under `/api/admin`.
+
+Relevant backend endpoints include:
+
+- `GET /api/health`
+- `GET /api/db-test`
+- `GET /api/admin/dashboard`
+- `GET /api/admin/products`
+- `GET /api/admin/orders`
+- `GET /api/admin/settings`
+- `GET /api/admin/reports/sales`
+
+The admin dashboard is not purely static. It depends on:
+
+- backend availability
+- valid MySQL credentials
+- expected database schema
+- readable admin settings storage under `backend/data/`
+
+## Frontend State
+
+Redux is configured in `src/app/store/`.
+
+Current notes:
+
+- The store is initialized so React Redux can mount cleanly.
+- Typed hooks live in `src/app/store/hooks.ts`.
+- Additional feature slices can be added later under `src/features/<feature>/`.
+
+## Chat / Auth Integrations
+
+### Firebase
+
+The frontend reads Firebase config from the root `.env`.
+
+Typical usage:
+
+- sign-in providers
+- auth state handling
+- admin access checks based on allowed email list
+
+### Chat Assistant
+
+The chat UI lives in `src/shared/components/ChatGPTBot.tsx`.
+
+Documentation rule:
+
+- keep API keys and provider secrets out of committed files
+- use placeholder examples only
+
+## Local Troubleshooting
+
+### Proxy errors
+
+Example:
+
+- `http proxy error: /api/admin/dashboard`
+- `connect ECONNREFUSED 127.0.0.1:4000`
+
+Meaning:
+
+- the frontend is running
+- the backend target is not reachable
+
+Checks:
+
+- confirm `npm run start:backend` works
+- confirm `VITE_API_PROXY_TARGET` matches the backend URL
+- confirm the backend port matches `PORT` in `backend/.env`
+
+### Backend 500 errors
+
+Common causes:
+
+- invalid database credentials
+- missing database schema
+- route/query errors
+
+Checks:
+
+- open `http://127.0.0.1:4000/api/health`
+- open `http://127.0.0.1:4000/api/db-test`
+- inspect backend terminal logs
+
+## Security and Documentation Rules
+
+- Never place real credentials in `README.md`, `DOCUMENTATION.md`, committed `.env.example` files, or screenshots.
+- Use placeholders such as `your-api-key`, `your-db-user`, and `your-db-password`.
+- Treat `backend/.env` as local machine configuration, not shared project documentation.

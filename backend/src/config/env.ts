@@ -13,5 +13,5 @@ export const env = {
   dbPort: readNumber(process.env.DB_PORT, 3306),
   dbName: process.env.DB_NAME ?? "appliansys_db",
   dbUser: process.env.DB_USER ?? "root",
-  dbPassword: process.env.DB_PASSWORD ?? "12345678",
+  dbPassword: process.env.DB_PASSWORD ?? "",
 };

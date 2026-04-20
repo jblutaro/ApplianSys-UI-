@@ -4,8 +4,12 @@ import {
   type ThunkAction,
 } from "@reduxjs/toolkit";
 
+function placeholderReducer(state = {}) {
+  return state;
+}
+
 export const store = configureStore({
-  reducer: {},
+  reducer: placeholderReducer,
 });
 
 export type AppDispatch = typeof store.dispatch;
