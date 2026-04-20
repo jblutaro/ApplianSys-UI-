@@ -124,6 +124,10 @@ h1 {
     box-shadow: 0 4px 12px rgba(170, 109, 39, 0.2);
 }
 
+.app-main--admin {
+    min-height: 100vh;
+}
+
 /* Home Page Styles */
 .home-page {
     padding: 40px 0;
