@@ -252,16 +252,58 @@ adminRouter.post("/products", async (req, res, next) => {
 });
 
 adminRouter.delete("/products/:productId", async (req, res, next) => {
-  try {
-    const productId = Number(req.params.productId);
+  const productId = Number(req.params.productId);
 
-    await dbPool.query("DELETE FROM INVENTORY WHERE product_id = ?", [productId]);
-    await dbPool.query("DELETE FROM PRODUCT WHERE product_id = ?", [productId]);
+  if (!Number.isInteger(productId) || productId <= 0) {
+    res.status(400).json({ ok: false, message: "A valid product id is required." });
+    return;
+  }
+
+  const connection = await dbPool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [productRows] = await connection.query<RowDataPacket[]>(
+      "SELECT product_id FROM PRODUCT WHERE product_id = ? LIMIT 1",
+      [productId],
+    );
+
+    if (!productRows[0]) {
+      await connection.rollback();
+      res.status(404).json({ ok: false, message: "Product not found." });
+      return;
+    }
+
+    const [orderItemRows] = await connection.query<RowDataPacket[]>(
+      "SELECT COUNT(*) AS count FROM ORDER_ITEM WHERE product_id = ?",
+      [productId],
+    );
+
+    const orderItemCount = Number(orderItemRows[0]?.count ?? 0);
+
+    if (orderItemCount > 0) {
+      await connection.rollback();
+      res.status(409).json({
+        ok: false,
+        message: "This product cannot be deleted because it is referenced by existing orders.",
+      });
+      return;
+    }
+
+    await connection.query("DELETE FROM CART_ITEM WHERE product_id = ?", [productId]);
+    await connection.query("DELETE FROM INVENTORY WHERE product_id = ?", [productId]);
+    await connection.query("DELETE FROM PRODUCT WHERE product_id = ?", [productId]);
+
+    await connection.commit();
 
     const products = await getProducts();
     res.json({ ok: true, products });
   } catch (error) {
+    await connection.rollback();
     next(error);
+  } finally {
+    connection.release();
   }
 });
 

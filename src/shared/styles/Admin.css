@@ -10,13 +10,25 @@
 .admin-sidebar {
   background: linear-gradient(180deg, #1f1b18 0%, #171412 100%);
   color: #f8f3ee;
+  box-sizing: border-box;
   padding: 28px 18px;
   display: flex;
   flex-direction: column;
   gap: 24px;
   position: sticky;
   top: 0;
-  height: 100vh;
+  align-self: start;
+  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.admin-sidebar__top {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
 }
 
 .admin-brand {
@@ -40,8 +52,12 @@
 
 .admin-sidebar__nav {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .admin-sidebar__link,
@@ -75,17 +91,21 @@
 }
 
 .admin-sidebar__footer {
-  margin-top: auto;
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .admin-sidebar__user {
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
 .admin-sidebar__user-label {
@@ -100,6 +120,14 @@
   color: #fff5e7;
   font-weight: 600;
   word-break: break-word;
+}
+
+.admin-sidebar__back {
+  justify-content: flex-start;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 .admin-content {
@@ -575,6 +603,17 @@
   .admin-sidebar {
     position: static;
     height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .admin-sidebar__top {
+    min-height: initial;
+  }
+
+  .admin-sidebar__nav {
+    overflow: visible;
+    padding-right: 0;
   }
 }
 

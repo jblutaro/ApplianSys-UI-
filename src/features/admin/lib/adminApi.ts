@@ -63,6 +63,13 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as { message?: string };
+      throw new Error(payload.message || "Request failed");
+    }
+
     const body = await response.text();
     throw new Error(body || "Request failed");
   }

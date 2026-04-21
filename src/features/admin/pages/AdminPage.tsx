@@ -804,23 +804,25 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <div className="admin-brand">
-          <h1 className="admin-brand__title">ApplianSys Admin</h1>
-          <span className="admin-brand__text">Control the storefront, orders, products, and platform behavior.</span>
-        </div>
+        <div className="admin-sidebar__top">
+          <div className="admin-brand">
+            <h1 className="admin-brand__title">ApplianSys Admin</h1>
+            <span className="admin-brand__text">Control the storefront, orders, products, and platform behavior.</span>
+          </div>
 
-        <nav className="admin-sidebar__nav">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`admin-sidebar__link${section === item.key ? " admin-sidebar__link--active" : ""}`}
-              onClick={() => setSearchParams({ section: item.key })}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+          <nav className="admin-sidebar__nav">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`admin-sidebar__link${section === item.key ? " admin-sidebar__link--active" : ""}`}
+                onClick={() => setSearchParams({ section: item.key })}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <div className="admin-sidebar__footer">
           <div className="admin-sidebar__user">

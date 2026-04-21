@@ -47,15 +47,31 @@ CREATE TABLE SUBCATEGORY (
         FOREIGN KEY (category_id) REFERENCES CATEGORY(category_id)
 );
 
+CREATE TABLE SUB_SUBCATEGORY (
+    subcategory_id               INT NOT NULL,
+    sub_subcategory_id           INT NOT NULL AUTO_INCREMENT,
+    sub_subcategory_name         VARCHAR(100) NOT NULL,
+    sub_subcategory_description  TEXT,
+    PRIMARY KEY (subcategory_id, sub_subcategory_id),
+    CONSTRAINT uq_sub_subcategory_id UNIQUE (sub_subcategory_id),
+    CONSTRAINT fk_sub_subcategory_subcategory
+        FOREIGN KEY (subcategory_id) REFERENCES SUBCATEGORY(subcategory_id)
+);
+
 CREATE TABLE PRODUCT (
     product_id             INT AUTO_INCREMENT PRIMARY KEY,
     subcategory_id         INT NOT NULL,
+    sub_subcategory_id     INT NULL,
     product_name           VARCHAR(150) NOT NULL,
     product_description    TEXT,
     price                  DECIMAL(10,2) NOT NULL,
-    product_image          VARCHAR(255),
+
     CONSTRAINT fk_product_subcategory
-        FOREIGN KEY (subcategory_id) REFERENCES SUBCATEGORY(subcategory_id)
+        FOREIGN KEY (subcategory_id) REFERENCES SUBCATEGORY(subcategory_id),
+
+    CONSTRAINT fk_product_sub_subcategory
+        FOREIGN KEY (subcategory_id, sub_subcategory_id)
+        REFERENCES SUB_SUBCATEGORY(subcategory_id, sub_subcategory_id)
 );
 
 CREATE TABLE INVENTORY (
@@ -157,3 +173,36 @@ CREATE TABLE PICKUP (
     CONSTRAINT fk_pickup_staff
         FOREIGN KEY (user_id) REFERENCES STAFF_USER(user_id)
 );
+
+CREATE INDEX idx_subcategory_category
+    ON SUBCATEGORY(category_id);
+
+CREATE INDEX idx_sub_subcategory_name
+    ON SUB_SUBCATEGORY(sub_subcategory_name);
+
+CREATE INDEX idx_product_subcategory
+    ON PRODUCT(subcategory_id);
+
+CREATE INDEX idx_product_subcategory_subsub
+    ON PRODUCT(subcategory_id, sub_subcategory_id);
+
+CREATE INDEX idx_inventory_product
+    ON INVENTORY(product_id);
+
+CREATE INDEX idx_cart_user
+    ON CART(user_id);
+
+CREATE INDEX idx_order_user
+    ON `ORDER`(user_id);
+
+CREATE INDEX idx_order_promo
+    ON `ORDER`(promo_id);
+
+CREATE INDEX idx_order_payment
+    ON `ORDER`(payment_id);
+
+CREATE INDEX idx_delivery_user
+    ON DELIVERY(user_id);
+
+CREATE INDEX idx_pickup_user
+    ON PICKUP(user_id);
