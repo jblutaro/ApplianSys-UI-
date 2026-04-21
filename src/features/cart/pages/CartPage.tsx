@@ -1,9 +1,9 @@
-import type { User } from "firebase/auth";
+import type { AppUser } from "@/shared/lib/auth";
 import { Link } from "react-router-dom";
 import "@/shared/styles/Cart.css";
 
 type CartPageProps = {
-  user: User | null;
+  user: AppUser | null;
   onAuthOpen: () => void;
 };
 

@@ -1,4 +1,5 @@
 import { dbPool } from "../config/database.js";
+import { hashPassword, SEEDED_USER_PASSWORD } from "../auth/password.js";
 
 async function scalarCount(tableName: string) {
   const [rows] = await dbPool.query(`SELECT COUNT(*) AS count FROM \`${tableName}\``);
@@ -161,18 +162,29 @@ async function seedProductsAndInventory() {
 
 async function seedUsersAndOrders() {
   const users = [
-    ["John", "", "Doe", "john@example.com", "hashed-password", "09170000001", "Active", "customer"],
-    ["Jane", "", "Smith", "jane@example.com", "hashed-password", "09170000002", "Active", "customer"],
-    ["Alice", "", "Johnson", "alice@example.com", "hashed-password", "09170000003", "Active", "customer"],
-    ["Bob", "", "Brown", "bob@example.com", "hashed-password", "09170000004", "Active", "customer"],
+    ["John", "", "Doe", "john@example.com", "09170000001", "Active", "customer"],
+    ["Jane", "", "Smith", "jane@example.com", "09170000002", "Active", "customer"],
+    ["Alice", "", "Johnson", "alice@example.com", "09170000003", "Active", "customer"],
+    ["Bob", "", "Brown", "bob@example.com", "09170000004", "Active", "customer"],
+    ["Admin", "", "User", "admin@example.com", "09170000000", "Active", "admin"],
   ];
 
   const createdUserIds: number[] = [];
 
   for (const user of users) {
+    const passwordHash = await hashPassword(SEEDED_USER_PASSWORD);
     const [result] = await dbPool.query(
       "INSERT INTO `USER` (fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)",
-      user,
+      [
+        user[0],
+        user[1],
+        user[2],
+        user[3],
+        passwordHash,
+        user[4],
+        user[5],
+        user[6],
+      ],
     );
     const userId = (result as { insertId: number }).insertId;
     createdUserIds.push(userId);

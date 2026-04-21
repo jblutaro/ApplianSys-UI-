@@ -7,7 +7,7 @@ ApplianSys is a React + Vite storefront with a separate Express + MySQL backend 
 - Frontend: React, TypeScript, Vite, React Router, MUI
 - State: Redux Toolkit, React Redux
 - Backend: Express, TypeScript, mysql2
-- Auth/UI integrations: Firebase
+- Auth/UI integrations: Local backend auth
 
 ## Project Layout
 
@@ -17,6 +17,21 @@ ApplianSys is a React + Vite storefront with a separate Express + MySQL backend 
 - `public/` static assets served by Vite
 - `.env.example` root environment template for the frontend
 - `backend/.env.example` backend environment template for the API
+
+### Frontend Structure
+
+The frontend is organized by feature under `src/features/`, with `src/shared/` for cross-feature code and `src/app/` for route shell and providers.
+
+The admin feature is now split by responsibility:
+
+- `src/features/admin/pages/`
+  Route-level composition
+- `src/features/admin/components/`
+  Section UI such as dashboard, products, orders, settings, and access states
+- `src/features/admin/hooks/`
+  Admin data orchestration and mutations
+- `src/features/admin/lib/`
+  API access, constants, access checks, and formatting helpers
 
 ## Environment Files
 
@@ -41,19 +56,12 @@ copy .env.example .env
 Expected keys:
 
 ```env
-VITE_FIREBASE_API_KEY=your-api-key
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-VITE_FIREBASE_APP_ID=your-app-id
 VITE_ADMIN_EMAILS=admin@example.com
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000
 ```
 
 Notes:
 
-- `VITE_FIREBASE_*` values come from your Firebase web app config.
 - `VITE_ADMIN_EMAILS` is a comma-separated list of emails allowed into the admin UI.
 - `VITE_API_PROXY_TARGET` is the backend URL Vite proxies `/api` requests to during development.
 - Restart the frontend dev server after changing the root `.env`.
@@ -75,12 +83,16 @@ DB_PORT=3306
 DB_NAME=appliansys_db
 DB_USER=your-db-user
 DB_PASSWORD=your-db-password
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 Notes:
 
 - These values are local-development placeholders only.
 - Use your own MySQL username and password.
+- `OPENAI_API_KEY` is used by the backend chatbot route.
+- `OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
 - Do not paste real secrets into the documentation or source-controlled examples.
 
 ## Setup
@@ -136,10 +148,15 @@ npm run start:backend
 - `npm run format` runs Prettier
 - `npm run build` builds the frontend
 - `npm run preview` previews the frontend build
+- `npm --prefix backend run hash:password -- <password>` generates a backend password hash
+- `npm --prefix backend run migrate:passwords` migrates plain-text `USER.password` rows to hashed storage
 
 ## Backend Notes
 
 - The admin dashboard depends on the backend API.
+- Email/password authentication is handled by backend routes under `/api/auth`.
+- The storefront chatbot now calls backend route `/api/chat`; the OpenAI key must stay in `backend/.env`.
+- Seeded local users default to password `ApplianSys123!`.
 - In dev mode, frontend `/api/...` requests are proxied through Vite to `VITE_API_PROXY_TARGET`.
 - If the backend is down, admin requests will fail with proxy errors such as `ECONNREFUSED 127.0.0.1:4000`.
 - If the backend is up but database credentials are wrong, admin endpoints can return `500`.

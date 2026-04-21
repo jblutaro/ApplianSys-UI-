@@ -1,6 +1,5 @@
 import "@/shared/styles/App.css";
 import { useEffect, useRef, useState } from "react";
-import type { User } from "firebase/auth";
 import { Link, Route, Routes, useNavigate } from "react-router-dom";
 
 import { AboutPage } from "@/features/about";
@@ -11,14 +10,10 @@ import { OrdersPage } from "@/features/orders";
 import { SearchPage } from "@/features/search";
 import { AuthModal } from "@/shared/components/AuthModal";
 import ChatGPTBot from "@/shared/components/ChatGPTBot";
-import {
-  completeOAuthRedirect,
-  signOutUser,
-  subscribeAuthState,
-} from "@/shared/lib/firebaseAuth";
+import { signOutUser, subscribeAuthState, type AppUser } from "@/shared/lib/auth";
 import { useLocation } from "react-router-dom";
 
-function UserAvatar({ user }: { user: User }) {
+function UserAvatar({ user }: { user: AppUser }) {
   const letter = (user.displayName || user.email || "U")[0].toUpperCase();
   if (user.photoURL) {
     return <img src={user.photoURL} alt={letter} className="user-avatar__img" />;
@@ -26,7 +21,7 @@ function UserAvatar({ user }: { user: User }) {
   return <span className="user-avatar__letter">{letter}</span>;
 }
 
-function NavCartLink({ user, onAuthOpen }: { user: User | null; onAuthOpen: () => void }) {
+function NavCartLink({ user, onAuthOpen }: { user: AppUser | null; onAuthOpen: () => void }) {
   const navigate = useNavigate();
   const handleClick = (e: React.MouseEvent) => {
     if (!user) {
@@ -45,7 +40,7 @@ function NavCartLink({ user, onAuthOpen }: { user: User | null; onAuthOpen: () =
 
 function App() {
   const [authOpen, setAuthOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -54,7 +49,6 @@ function App() {
   const canAccessAdmin = isAdminUser(user);
 
   useEffect(() => {
-    void completeOAuthRedirect();
     return subscribeAuthState(setUser);
   }, []);
 
@@ -71,6 +65,12 @@ function App() {
   const handleSignOut = async () => {
     setDropdownOpen(false);
     await signOutUser();
+  };
+
+  const handleAuthenticated = (authenticatedUser: AppUser | null) => {
+    if (authenticatedUser?.role === "admin") {
+      void navigate("/admin");
+    }
   };
 
   return (
@@ -185,6 +185,7 @@ function App() {
 
       <AuthModal
         open={authOpen}
+        onAuthenticated={handleAuthenticated}
         onClose={() => setAuthOpen(false)}
         user={user}
       />

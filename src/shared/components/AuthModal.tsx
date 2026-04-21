@@ -1,73 +1,24 @@
 import { type FormEvent, useEffect, useId, useState } from "react";
-import type { User } from "firebase/auth";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 import {
-  FIREBASE_ENV_HELP,
-  isFirebaseAuthConfigured,
   signInWithEmail,
-  signInWithFacebook,
-  signInWithGoogle,
   signOutUser,
   signUpWithEmail,
-} from "@/shared/lib/firebaseAuth";
+  type AppUser,
+} from "@/shared/lib/auth";
 
 type AuthMode = "login" | "signup";
 
 type AuthModalProps = {
   open: boolean;
+  onAuthenticated: (user: AppUser | null) => void;
   onClose: () => void;
-  user: User | null;
+  user: AppUser | null;
 };
 
-function GoogleIcon() {
-  return (
-    <svg
-      className="auth-modal__social-icon"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      aria-hidden
-    >
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-      />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg
-      className="auth-modal__social-icon"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      aria-hidden
-    >
-      <path
-        fill="#1877F2"
-        d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
-      />
-    </svg>
-  );
-}
-
-export function AuthModal({ open, onClose, user }: AuthModalProps) {
+export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalProps) {
   const titleId = useId();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -78,8 +29,6 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const oauthReady = isFirebaseAuthConfigured();
-
   useEffect(() => {
     if (!open) return;
     setError(null);
@@ -88,17 +37,21 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
 
   useEffect(() => {
     if (!open) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;
+
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = previous;
     };
@@ -109,21 +62,23 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!oauthReady) {
-      setError(FIREBASE_ENV_HELP);
-      return;
-    }
+
     if (mode === "signup" && password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
+
     setBusy(true);
+
     try {
+      let authenticatedUser: AppUser | null;
       if (mode === "login") {
-        await signInWithEmail(email.trim(), password);
+        authenticatedUser = await signInWithEmail(email.trim(), password);
       } else {
-        await signUpWithEmail(email.trim(), password);
+        authenticatedUser = await signUpWithEmail(email.trim(), password);
       }
+
+      onAuthenticated(authenticatedUser);
       onClose();
     } catch (err: unknown) {
       const message =
@@ -136,36 +91,10 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
     }
   };
 
-  const runOAuth = async (fn: () => Promise<void>) => {
-    setError(null);
-    if (!oauthReady) {
-      setError(FIREBASE_ENV_HELP);
-      return;
-    }
-    setBusy(true);
-    try {
-      await fn();
-      onClose();
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "Sign-in failed.";
-      setError(message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const primaryLabel = mode === "login" ? "Log in" : "Sign up";
-  const oauthVerb = mode === "login" ? "Log in" : "Sign up";
 
   return (
-    <div
-      className="auth-modal-overlay"
-      role="presentation"
-      onClick={onClose}
-    >
+    <div className="auth-modal-overlay" role="presentation" onClick={onClose}>
       <div
         className="auth-modal"
         role="dialog"
@@ -179,7 +108,7 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
           onClick={onClose}
           aria-label="Close"
         >
-          ×
+          x
         </button>
 
         {user ? (
@@ -188,8 +117,7 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
               Account
             </h2>
             <p className="auth-modal__signed-in">
-              Signed in as{" "}
-              <strong>{user.displayName || user.email || "User"}</strong>
+              Signed in as <strong>{user.displayName || user.email || "User"}</strong>
             </p>
             <button
               type="button"
@@ -216,9 +144,9 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
               {mode === "login" ? "Log in" : "Sign up"}
             </h2>
 
-            {!oauthReady && (
-              <p className="auth-modal__hint">{FIREBASE_ENV_HELP}</p>
-            )}
+            <p className="auth-modal__hint">
+              Local accounts are now managed directly by the ApplianSys backend.
+            </p>
 
             <form className="auth-modal__form" onSubmit={handleSubmit}>
               <label className="auth-modal__label" htmlFor="auth-email">
@@ -245,9 +173,7 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
                   id="auth-password"
                   className="auth-modal__input auth-modal__input--with-toggle"
                   type={showPassword ? "text" : "password"}
-                  autoComplete={
-                    mode === "login" ? "current-password" : "new-password"
-                  }
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -264,12 +190,9 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
                 </button>
               </div>
 
-              {mode === "signup" && (
+              {mode === "signup" ? (
                 <>
-                  <label
-                    className="auth-modal__label"
-                    htmlFor="auth-confirm"
-                  >
+                  <label className="auth-modal__label" htmlFor="auth-confirm">
                     Confirm password
                   </label>
                   <div className="auth-modal__field-wrap">
@@ -278,7 +201,7 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
                       className="auth-modal__input auth-modal__input--with-toggle"
                       type={showConfirm ? "text" : "password"}
                       autoComplete="new-password"
-                      placeholder="Enter your password"
+                      placeholder="Confirm your password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
@@ -288,61 +211,20 @@ export function AuthModal({ open, onClose, user }: AuthModalProps) {
                       type="button"
                       className="auth-modal__toggle-visibility"
                       onClick={() => setShowConfirm((v) => !v)}
-                      aria-label={
-                        showConfirm ? "Hide password" : "Show password"
-                      }
+                      aria-label={showConfirm ? "Hide password" : "Show password"}
                     >
                       {showConfirm ? <VisibilityOff /> : <Visibility />}
                     </button>
                   </div>
                 </>
-              )}
+              ) : null}
 
-              {error && <p className="auth-modal__error">{error}</p>}
+              {error ? <p className="auth-modal__error">{error}</p> : null}
 
-              <button
-                type="submit"
-                className="auth-modal__primary"
-                disabled={busy}
-              >
+              <button type="submit" className="auth-modal__primary" disabled={busy}>
                 {primaryLabel}
               </button>
             </form>
-
-            <div className="auth-modal__divider">
-              <span>or</span>
-            </div>
-
-            <div className="auth-modal__socials">
-              <button
-                type="button"
-                className="auth-modal__social"
-                disabled={busy}
-                onClick={() => runOAuth(signInWithGoogle)}
-                title={
-                  oauthReady
-                    ? undefined
-                    : "Set VITE_FIREBASE_* variables to enable"
-                }
-              >
-                <GoogleIcon />
-                {oauthVerb} with Google
-              </button>
-              <button
-                type="button"
-                className="auth-modal__social"
-                disabled={busy}
-                onClick={() => runOAuth(signInWithFacebook)}
-                title={
-                  oauthReady
-                    ? undefined
-                    : "Set VITE_FIREBASE_* variables to enable"
-                }
-              >
-                <FacebookIcon />
-                {oauthVerb} with Facebook
-              </button>
-            </div>
 
             <p className="auth-modal__footer">
               {mode === "signup" ? (

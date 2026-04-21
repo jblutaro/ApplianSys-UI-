@@ -2,7 +2,6 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import "../styles/ChatBot.css";
 
 type Role = "user" | "assistant";
-type OpenAIRole = "system" | Role;
 
 type Message = {
   role: Role;
@@ -14,26 +13,6 @@ const INITIAL_MESSAGE: Message = {
   text: "Hi! I'm your ApplianSys assistant. How can I help?",
 };
 
-const SYSTEM_PROMPT =
-  "You are a helpful assistant for the ApplianSys storefront. Keep answers concise and practical. They sell electronic appliances like speakers, TVs, refrigerators, washing machines, and microwaves. Assist users with product information, recommendations, and store policies.";
-
-const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-
-type OpenAIMessage = {
-  role: OpenAIRole;
-  content: string;
-};
-
-function buildMessages(history: Message[]): OpenAIMessage[] {
-  return [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...history.map((message) => ({
-      role: message.role,
-      content: message.text,
-    })),
-  ];
-}
-
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -42,32 +21,13 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
-function isUnknownArray(value: unknown): value is unknown[] {
-  return Array.isArray(value);
-}
-
 function extractReply(data: unknown) {
-  if (!data || typeof data !== "object" || !("choices" in data)) {
+  if (!data || typeof data !== "object" || !("reply" in data)) {
     return "";
   }
 
-  const choices = (data as { choices?: unknown }).choices;
-  if (!isUnknownArray(choices) || choices.length === 0) {
-    return "";
-  }
-
-  const first = choices[0];
-  if (!first || typeof first !== "object" || !("message" in first)) {
-    return "";
-  }
-
-  const message = (first as { message?: unknown }).message;
-  if (!message || typeof message !== "object" || !("content" in message)) {
-    return "";
-  }
-
-  const content = (message as { content?: unknown }).content;
-  return typeof content === "string" ? content.trim() : "";
+  const reply = (data as { reply?: unknown }).reply;
+  return typeof reply === "string" ? reply.trim() : "";
 }
 
 export default function ChatGPTBot() {
@@ -87,18 +47,6 @@ export default function ChatGPTBot() {
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Missing API key. Set VITE_OPENAI_API_KEY and restart Vite.",
-        },
-      ]);
-      return;
-    }
-
     const userMessage: Message = { role: "user", text: trimmed };
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
@@ -111,20 +59,14 @@ export default function ChatGPTBot() {
           ? nextMessages.slice(1)
           : nextMessages;
 
-      const model = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
-      const payload = {
-        model,
-        messages: buildMessages(history),
-        temperature: 0.7,
-      };
-
-      const response = await fetch(OPENAI_ENDPOINT, {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          messages: history,
+        }),
       });
 
       if (!response.ok) {
@@ -147,7 +89,7 @@ export default function ChatGPTBot() {
         ...prev,
         {
           role: "assistant",
-          text: "I had trouble reaching the server. Check your API key and network.",
+          text: "I had trouble reaching the server. Check the backend chat configuration.",
         },
       ]);
     } finally {

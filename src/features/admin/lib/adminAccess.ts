@@ -1,4 +1,4 @@
-import type { User } from "firebase/auth";
+import type { AppUser } from "@/shared/lib/auth";
 
 function parseAdminEmails(raw: string | undefined) {
   return (raw ?? "")
@@ -7,7 +7,7 @@ function parseAdminEmails(raw: string | undefined) {
     .filter(Boolean);
 }
 
-export function isAdminUser(user: User | null) {
+export function isAdminUser(user: AppUser | null) {
   if (!user?.email) return false;
 
   const email = user.email.toLowerCase();
@@ -17,5 +17,5 @@ export function isAdminUser(user: User | null) {
       : undefined;
   const envAdmins = parseAdminEmails(adminEmails);
 
-  return envAdmins.includes(email) || email.startsWith("admin");
+  return user.role === "admin" || envAdmins.includes(email) || email.startsWith("admin");
 }

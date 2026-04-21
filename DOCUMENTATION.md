@@ -19,6 +19,28 @@ The storefront UI can render without the backend for some routes, but the admin 
 - Feature pages: `src/features/*/pages`
 - Shared assets/components: `src/shared/`
 
+For larger frontend features, code is split into:
+
+- `pages/`
+  Route-level containers
+- `components/`
+  Section or presentational UI
+- `hooks/`
+  Feature-scoped state orchestration
+- `lib/`
+  API clients, constants, utilities, and guards
+
+Current concrete example:
+
+- `src/features/admin/pages/AdminPage.tsx`
+  Admin route coordinator
+- `src/features/admin/components/*`
+  Dashboard, products, orders, settings, and access-state UI
+- `src/features/admin/hooks/useAdminDashboard.ts`
+  Admin loading and mutation orchestration
+- `src/features/admin/lib/*`
+  Admin API access, constants, formatting, and access checks
+
 ### Backend
 
 - Server entry: `backend/src/server.ts`
@@ -43,7 +65,6 @@ Two separate `.env` files are expected.
 Purpose:
 
 - Vite environment values
-- Firebase web config
 - Admin email allowlist
 - Dev proxy target for `/api`
 
@@ -54,12 +75,6 @@ Source template:
 Expected keys:
 
 ```env
-VITE_FIREBASE_API_KEY=your-api-key
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-VITE_FIREBASE_APP_ID=your-app-id
 VITE_ADMIN_EMAILS=admin@example.com
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000
 ```
@@ -90,12 +105,15 @@ DB_PORT=3306
 DB_NAME=appliansys_db
 DB_USER=your-db-user
 DB_PASSWORD=your-db-password
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 Guidance:
 
 - These values remain server-side and must stay local.
 - Use your actual local database credentials.
+- Keep `OPENAI_API_KEY` in `backend/.env`, not the frontend `.env`.
 - Do not commit populated backend credentials.
 
 ## Development Workflow
@@ -140,6 +158,8 @@ npm run start:backend
 npm run build
 npm run lint
 npm run format
+npm --prefix backend run hash:password -- <password>
+npm --prefix backend run migrate:passwords
 ```
 
 ## Request Flow
@@ -165,6 +185,11 @@ Relevant backend endpoints include:
 
 - `GET /api/health`
 - `GET /api/db-test`
+- `GET /api/auth/me`
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/logout`
+- `POST /api/chat`
 - `GET /api/admin/dashboard`
 - `GET /api/admin/products`
 - `GET /api/admin/orders`
@@ -190,19 +215,25 @@ Current notes:
 
 ## Chat / Auth Integrations
 
-### Firebase
+### Local Auth
 
-The frontend reads Firebase config from the root `.env`.
+Authentication is handled by the Express backend and the MySQL `USER` table.
 
-Typical usage:
+Current usage:
 
-- sign-in providers
-- auth state handling
-- admin access checks based on allowed email list
+- backend session cookie auth via `/api/auth/*`
+- local seeded or registered email/password accounts
+- admin access checks based on user role, allowed email list, or `admin*` email prefixes
+- password storage hashed with backend-side `scrypt`
+
+Default seeded password:
+
+- `ApplianSys123!`
 
 ### Chat Assistant
 
 The chat UI lives in `src/shared/components/ChatGPTBot.tsx`.
+The OpenAI request is proxied through backend route `POST /api/chat`.
 
 Documentation rule:
 
