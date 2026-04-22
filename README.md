@@ -20,18 +20,52 @@ ApplianSys is a React + Vite storefront with a separate Express + MySQL backend 
 
 ### Frontend Structure
 
-The frontend is organized by feature under `src/features/`, with `src/shared/` for cross-feature code and `src/app/` for route shell and providers.
+The frontend is organized by layer:
 
-The admin feature is now split by responsibility:
+- `src/app/`
+  App shell, route composition, top-level hooks, providers, and store setup
+- `src/features/`
+  Route features such as admin, about, cart, category, orders, and search
+- `src/shared/`
+  Cross-feature components, hooks, request helpers, chat/auth clients, assets, and styles
+
+Current shell/auth/chat split:
+
+- `src/app/App.tsx`
+  Top-level composition only
+- `src/app/components/AppHeader.tsx`
+  Header composition
+- `src/app/components/header/*`
+  Header navigation, user menu, and avatar subcomponents
+- `src/app/components/AppRoutes.tsx`
+  Route mapping
+- `src/app/hooks/useAuthUser.ts`
+  App-wide auth subscription hook
+- `src/shared/components/AuthModal.tsx`
+  Auth modal coordinator
+- `src/shared/components/auth/*`
+  Auth account and credentials panels
+- `src/shared/lib/http.ts`
+  Shared JSON request helper
+- `src/shared/lib/auth.ts`
+  Frontend auth client and auth state emitter
+- `src/shared/lib/chat.ts`
+  Chat API client and message types
+- `src/shared/hooks/useChatbot.ts`
+  Chatbot state/orchestration hook
+
+The admin feature remains split by responsibility:
 
 - `src/features/admin/pages/`
   Route-level composition
 - `src/features/admin/components/`
-  Section UI such as dashboard, products, orders, settings, and access states
+  Section UI such as dashboard, products, orders, platform settings, account settings, and access states
 - `src/features/admin/hooks/`
   Admin data orchestration and mutations
 - `src/features/admin/lib/`
   API access, constants, access checks, and formatting helpers
+- `src/features/settings/`
+  Customer-only signed-user settings page and preference persistence
 
 ## Environment Files
 
@@ -150,13 +184,34 @@ npm run start:backend
 - `npm run preview` previews the frontend build
 - `npm --prefix backend run hash:password -- <password>` generates a backend password hash
 - `npm --prefix backend run migrate:passwords` migrates plain-text `USER.password` rows to hashed storage
+- `npm --prefix backend run migrate:account-ids` backfills ULID-based public account IDs into `USER.account_id`
 
 ## Backend Notes
 
 - The admin dashboard depends on the backend API.
 - Email/password authentication is handled by backend routes under `/api/auth`.
-- The storefront chatbot now calls backend route `/api/chat`; the OpenAI key must stay in `backend/.env`.
+- Backend auth flow is split between:
+  - `backend/src/routes/auth.ts`
+  - `backend/src/services/auth/*`
+  - `backend/src/auth/*`
+- The storefront chatbot now calls backend route `/api/chat`.
+- Backend chat flow is split between:
+  - `backend/src/routes/chat.ts`
+  - `backend/src/services/chat/*`
+- The OpenAI key must stay in `backend/.env`.
+- Users now have a public ULID-based `account_id` in the database while numeric `user_id` remains the internal primary key.
+- Auth now exposes account profile/password endpoints under `/api/auth/account` and `/api/auth/password`.
+- Admin backend flow is split between:
+  - `backend/src/routes/admin*.ts`
+  - `backend/src/services/admin/*`
 - Seeded local users default to password `ApplianSys123!`.
+- Admin accounts are constrained to admin work only:
+  - no cart
+  - no customer order page
+  - no customer settings page
+- Admin panel navigation now separates:
+  - `Platform` for storefront-wide settings
+  - `Settings` for the signed-in admin's own account and password management
 - In dev mode, frontend `/api/...` requests are proxied through Vite to `VITE_API_PROXY_TARGET`.
 - If the backend is down, admin requests will fail with proxy errors such as `ECONNREFUSED 127.0.0.1:4000`.
 - If the backend is up but database credentials are wrong, admin endpoints can return `500`.

@@ -1,111 +1,29 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useChatbot } from "@/shared/hooks/useChatbot";
 import "../styles/ChatBot.css";
 
-type Role = "user" | "assistant";
-
-type Message = {
-  role: Role;
-  text: string;
-};
-
-const INITIAL_MESSAGE: Message = {
-  role: "assistant",
-  text: "Hi! I'm your ApplianSys assistant. How can I help?",
-};
-
-function safeJsonParse(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function extractReply(data: unknown) {
-  if (!data || typeof data !== "object" || !("reply" in data)) {
-    return "";
-  }
-
-  const reply = (data as { reply?: unknown }).reply;
-  return typeof reply === "string" ? reply.trim() : "";
-}
-
 export default function ChatGPTBot() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const {
+    handleClear,
+    handleSend,
+    input,
+    isLoading,
+    isOpen,
+    messages,
+    setInput,
+    toggleOpen,
+  } = useChatbot();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen]);
 
-  const handleSend = async (event?: FormEvent) => {
-    event?.preventDefault();
-
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
-
-    const userMessage: Message = { role: "user", text: trimmed };
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
-    setInput("");
-    setIsLoading(true);
-
-    try {
-      const history =
-        nextMessages[0] === INITIAL_MESSAGE
-          ? nextMessages.slice(1)
-          : nextMessages;
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: history,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `OpenAI request failed (${response.status}): ${errorText}`,
-        );
-      }
-
-      const raw = await response.text();
-      const data = safeJsonParse(raw);
-      const replyText =
-        extractReply(data) ||
-        "I couldn't generate a response. Please try again.";
-
-      setMessages((prev) => [...prev, { role: "assistant", text: replyText }]);
-    } catch (error) {
-      console.error(error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "I had trouble reaching the server. Check the backend chat configuration.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleClear = () => {
-    setMessages([INITIAL_MESSAGE]);
-  };
-
   return (
     <>
       <button
         className="chatbot-fab"
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={toggleOpen}
         aria-label={isOpen ? "Close chat" : "Open chat"}
       >
         {isOpen ? "X" : "Chat"}

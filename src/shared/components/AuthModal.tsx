@@ -1,7 +1,6 @@
 import { type FormEvent, useEffect, useId, useState } from "react";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
-
+import { AuthAccountPanel } from "@/shared/components/auth/AuthAccountPanel";
+import { AuthCredentialsForm } from "@/shared/components/auth/AuthCredentialsForm";
 import {
   signInWithEmail,
   signOutUser,
@@ -91,8 +90,6 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
     }
   };
 
-  const primaryLabel = mode === "login" ? "Log in" : "Sign up";
-
   return (
     <div className="auth-modal-overlay" role="presentation" onClick={onClose}>
       <div
@@ -112,146 +109,34 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
         </button>
 
         {user ? (
-          <>
-            <h2 id={titleId} className="auth-modal__title">
-              Account
-            </h2>
-            <p className="auth-modal__signed-in">
-              Signed in as <strong>{user.displayName || user.email || "User"}</strong>
-            </p>
-            <button
-              type="button"
-              className="auth-modal__primary"
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await signOutUser();
-                  onClose();
-                } catch {
-                  setError("Could not sign out.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              disabled={busy}
-            >
-              Sign out
-            </button>
-          </>
+          <AuthAccountPanel
+            busy={busy}
+            onClose={onClose}
+            onSignOut={signOutUser}
+            setError={setError}
+            setBusy={setBusy}
+            titleId={titleId}
+            user={user}
+          />
         ) : (
-          <>
-            <h2 id={titleId} className="auth-modal__title">
-              {mode === "login" ? "Log in" : "Sign up"}
-            </h2>
-
-            <p className="auth-modal__hint">
-              Local accounts are now managed directly by the ApplianSys backend.
-            </p>
-
-            <form className="auth-modal__form" onSubmit={handleSubmit}>
-              <label className="auth-modal__label" htmlFor="auth-email">
-                Email
-              </label>
-              <div className="auth-modal__field-wrap">
-                <input
-                  id="auth-email"
-                  className="auth-modal__input"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="Enter your email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <label className="auth-modal__label" htmlFor="auth-password">
-                Password
-              </label>
-              <div className="auth-modal__field-wrap">
-                <input
-                  id="auth-password"
-                  className="auth-modal__input auth-modal__input--with-toggle"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  className="auth-modal__toggle-visibility"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </button>
-              </div>
-
-              {mode === "signup" ? (
-                <>
-                  <label className="auth-modal__label" htmlFor="auth-confirm">
-                    Confirm password
-                  </label>
-                  <div className="auth-modal__field-wrap">
-                    <input
-                      id="auth-confirm"
-                      className="auth-modal__input auth-modal__input--with-toggle"
-                      type={showConfirm ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
-                    <button
-                      type="button"
-                      className="auth-modal__toggle-visibility"
-                      onClick={() => setShowConfirm((v) => !v)}
-                      aria-label={showConfirm ? "Hide password" : "Show password"}
-                    >
-                      {showConfirm ? <VisibilityOff /> : <Visibility />}
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              {error ? <p className="auth-modal__error">{error}</p> : null}
-
-              <button type="submit" className="auth-modal__primary" disabled={busy}>
-                {primaryLabel}
-              </button>
-            </form>
-
-            <p className="auth-modal__footer">
-              {mode === "signup" ? (
-                <>
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    className="auth-modal__link"
-                    onClick={() => setMode("login")}
-                  >
-                    Log in
-                  </button>
-                </>
-              ) : (
-                <>
-                  Don&apos;t have an account?{" "}
-                  <button
-                    type="button"
-                    className="auth-modal__link"
-                    onClick={() => setMode("signup")}
-                  >
-                    Sign up
-                  </button>
-                </>
-              )}
-            </p>
-          </>
+          <AuthCredentialsForm
+            busy={busy}
+            confirmPassword={confirmPassword}
+            email={email}
+            error={error}
+            mode={mode}
+            onSubmit={handleSubmit}
+            password={password}
+            setConfirmPassword={setConfirmPassword}
+            setEmail={setEmail}
+            setMode={setMode}
+            setPassword={setPassword}
+            setShowConfirm={setShowConfirm}
+            setShowPassword={setShowPassword}
+            showConfirm={showConfirm}
+            showPassword={showPassword}
+            titleId={titleId}
+          />
         )}
       </div>
     </div>

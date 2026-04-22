@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
     "hash:password": "tsx src/scripts/hashPassword.ts",
-    "migrate:passwords": "tsx src/scripts/migratePlaintextPasswords.ts"
+    "migrate:passwords": "tsx src/scripts/migratePlaintextPasswords.ts",
+    "migrate:account-ids": "tsx src/scripts/migrateAccountIds.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

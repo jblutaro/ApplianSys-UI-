@@ -97,6 +97,32 @@
     margin: 0;
 }
 
+.orders-empty__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    min-height: 46px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 12px;
+    background: var(--primary-gold);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.orders-empty__btn:hover {
+    background: var(--primary-gold-hover);
+}
+
+.orders-empty__btn-link {
+    text-decoration: none;
+}
+
 /* Order cards */
 .orders-list {
     display: flex;

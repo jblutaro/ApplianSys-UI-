@@ -3,6 +3,7 @@ USE appliansys_db;
 
 CREATE TABLE `USER` (
     user_id        INT AUTO_INCREMENT PRIMARY KEY,
+    account_id     VARCHAR(32) NOT NULL UNIQUE,
     fname          VARCHAR(100) NOT NULL,
     mname          VARCHAR(100),
     lname          VARCHAR(100) NOT NULL,

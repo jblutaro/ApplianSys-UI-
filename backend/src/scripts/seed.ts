@@ -1,4 +1,5 @@
 import { dbPool } from "../config/database.js";
+import { generateAccountId } from "../auth/accountId.js";
 import { hashPassword, SEEDED_USER_PASSWORD } from "../auth/password.js";
 
 async function scalarCount(tableName: string) {
@@ -173,9 +174,11 @@ async function seedUsersAndOrders() {
 
   for (const user of users) {
     const passwordHash = await hashPassword(SEEDED_USER_PASSWORD);
+    const accountId = generateAccountId(user[6]);
     const [result] = await dbPool.query(
-      "INSERT INTO `USER` (fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)",
+      "INSERT INTO `USER` (account_id, fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)",
       [
+        accountId,
         user[0],
         user[1],
         user[2],

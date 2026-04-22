@@ -1,5 +1,6 @@
 import type { AppUser } from "@/shared/lib/auth";
 import { Link } from "react-router-dom";
+import { isAdminUser } from "@/features/admin";
 import "@/shared/styles/Cart.css";
 
 type CartPageProps = {
@@ -21,6 +22,25 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
         <button type="button" className="cart-auth-wall__btn" onClick={onAuthOpen}>
           Sign in / Log in
         </button>
+      </div>
+    );
+  }
+
+  if (isAdminUser(user)) {
+    return (
+      <div className="cart-auth-wall">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#aa6d27" strokeWidth="1.5" aria-hidden>
+          <path d="M3 21h18"/>
+          <path d="M5 21V7l8-4 6 4v14"/>
+          <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
+        </svg>
+        <h2 className="cart-auth-wall__title">Admins cannot use the shopping cart</h2>
+        <p className="cart-auth-wall__sub">
+          Admin accounts are restricted to platform duties. Use the admin panel to manage the storefront.
+        </p>
+        <Link to="/admin" className="cart-auth-wall__btn cart-auth-wall__btn-link">
+          Open Admin Panel
+        </Link>
       </div>
     );
   }

@@ -19,7 +19,7 @@ export function SettingsSection({
         <div className="admin-card__header">
           <div>
             <h2 className="admin-card__title">Platform Settings</h2>
-            <p className="admin-card__sub">Configure global application settings and preferences.</p>
+            <p className="admin-card__sub">Configure storefront-wide settings and platform behavior.</p>
           </div>
         </div>
 

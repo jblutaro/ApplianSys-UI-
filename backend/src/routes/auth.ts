@@ -1,28 +1,17 @@
-import { Router, type Response } from "express";
-import {
-  hashPassword,
-  isLegacyPlaintextPassword,
-  LEGACY_SEEDED_PASSWORD_MARKER,
-  SEEDED_USER_PASSWORD,
-  verifyPassword,
-} from "../auth/password.js";
+import { Router } from "express";
 import { clearSession, createSession, readSession } from "../auth/session.js";
+import { mapPublicUser } from "../auth/users.js";
 import {
-  createLocalUser,
-  findUserByEmail,
-  findUserById,
-  isActiveStatus,
-  mapPublicUser,
-  normalizeEmail,
-  touchUserLogin,
-  updateUserPassword,
-} from "../auth/users.js";
+  authenticateLocalUser,
+  changeAccountPassword,
+  getAccountProfile,
+  getAuthenticatedUser,
+  registerLocalUser,
+  saveAccountProfile,
+} from "../services/auth/localAuth.js";
+import { isAuthServiceError } from "../services/auth/errors.js";
 
 export const authRouter = Router();
-
-function sendInvalidCredentials(res: Response) {
-  res.status(401).json({ ok: false, message: "Invalid email or password." });
-}
 
 authRouter.get("/me", async (req, res, next) => {
   try {
@@ -32,8 +21,8 @@ authRouter.get("/me", async (req, res, next) => {
       return;
     }
 
-    const user = await findUserById(session.userId);
-    if (!user || !isActiveStatus(user.status)) {
+    const user = await getAuthenticatedUser(session.userId);
+    if (!user) {
       clearSession(req, res);
       res.json({ ok: true, user: null });
       return;
@@ -60,45 +49,19 @@ authRouter.post("/login", async (req, res, next) => {
       return;
     }
 
-    const user = await findUserByEmail(normalizeEmail(email));
-    if (!user) {
-      sendInvalidCredentials(res);
-      return;
-    }
-
-    if (!isActiveStatus(user.status)) {
-      res.status(403).json({ ok: false, message: "This account is inactive." });
-      return;
-    }
-
-    let isValidPassword = await verifyPassword(password, user.password);
-    if (!isValidPassword) {
-      const canUpgradeLegacySeed =
-        user.password === LEGACY_SEEDED_PASSWORD_MARKER &&
-        password === SEEDED_USER_PASSWORD;
-      const canUpgradePlaintext = isLegacyPlaintextPassword(password, user.password);
-
-      if (canUpgradeLegacySeed || canUpgradePlaintext) {
-        const upgradedHash = await hashPassword(password);
-        await updateUserPassword(user.user_id, upgradedHash);
-        isValidPassword = true;
-      }
-    }
-
-    if (!isValidPassword) {
-      sendInvalidCredentials(res);
-      return;
-    }
-
-    await touchUserLogin(user.user_id);
-    const refreshedUser = (await findUserById(user.user_id)) ?? user;
+    const user = await authenticateLocalUser(email, password);
     const session = createSession(res, user.user_id);
 
     res.json({
       ok: true,
-      user: mapPublicUser(refreshedUser, session.authSource),
+      user: mapPublicUser(user, session.authSource),
     });
   } catch (error) {
+    if (isAuthServiceError(error)) {
+      res.status(error.statusCode).json({ ok: false, message: error.message });
+      return;
+    }
+
     next(error);
   }
 });
@@ -120,15 +83,7 @@ authRouter.post("/register", async (req, res, next) => {
       return;
     }
 
-    const normalizedEmail = normalizeEmail(email);
-    const existingUser = await findUserByEmail(normalizedEmail);
-    if (existingUser) {
-      res.status(409).json({ ok: false, message: "An account with that email already exists." });
-      return;
-    }
-
-    const passwordHash = await hashPassword(password);
-    const user = await createLocalUser(normalizedEmail, passwordHash);
+    const user = await registerLocalUser(email, password);
     const session = createSession(res, user.user_id);
 
     res.status(201).json({
@@ -136,6 +91,11 @@ authRouter.post("/register", async (req, res, next) => {
       user: mapPublicUser(user, session.authSource),
     });
   } catch (error) {
+    if (isAuthServiceError(error)) {
+      res.status(error.statusCode).json({ ok: false, message: error.message });
+      return;
+    }
+
     next(error);
   }
 });
@@ -143,4 +103,82 @@ authRouter.post("/register", async (req, res, next) => {
 authRouter.post("/logout", (req, res) => {
   clearSession(req, res);
   res.json({ ok: true });
+});
+
+authRouter.get("/account", async (req, res, next) => {
+  try {
+    const session = readSession(req);
+    if (!session) {
+      res.status(401).json({ ok: false, message: "Authentication required." });
+      return;
+    }
+
+    const account = await getAccountProfile(session.userId);
+    res.json({ ok: true, account });
+  } catch (error) {
+    if (isAuthServiceError(error)) {
+      res.status(error.statusCode).json({ ok: false, message: error.message });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+authRouter.put("/account", async (req, res, next) => {
+  try {
+    const session = readSession(req);
+    if (!session) {
+      res.status(401).json({ ok: false, message: "Authentication required." });
+      return;
+    }
+
+    const { contactNumber, firstName, lastName, middleName } = req.body as {
+      contactNumber?: string;
+      firstName?: string;
+      lastName?: string;
+      middleName?: string;
+    };
+
+    const account = await saveAccountProfile(session.userId, {
+      contactNumber: contactNumber ?? "",
+      firstName: firstName ?? "",
+      lastName: lastName ?? "",
+      middleName: middleName ?? "",
+    });
+
+    res.json({ ok: true, account });
+  } catch (error) {
+    if (isAuthServiceError(error)) {
+      res.status(error.statusCode).json({ ok: false, message: error.message });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+authRouter.put("/password", async (req, res, next) => {
+  try {
+    const session = readSession(req);
+    if (!session) {
+      res.status(401).json({ ok: false, message: "Authentication required." });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    await changeAccountPassword(session.userId, currentPassword ?? "", newPassword ?? "");
+    res.json({ ok: true });
+  } catch (error) {
+    if (isAuthServiceError(error)) {
+      res.status(error.statusCode).json({ ok: false, message: error.message });
+      return;
+    }
+
+    next(error);
+  }
 });

@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { isAdminUser } from "@/features/admin";
+import type { AppUser } from "@/shared/lib/auth";
 import "@/shared/styles/Orders.css";
 
 type Tab = "all" | "pending" | "shipped" | "delivered";
@@ -25,9 +28,50 @@ const ORDERS: {
   items: { name: string; qty: number; price: number }[];
 }[] = [];
 
-function OrdersPage() {
+type OrdersPageProps = {
+  onAuthOpen: () => void;
+  user: AppUser | null;
+};
+
+function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
+
+  if (!user) {
+    return (
+      <div className="orders-empty">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#aa6d27" strokeWidth="1.5" aria-hidden>
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+          <path d="M9 12h6M9 16h4"/>
+        </svg>
+        <h2 className="orders-page__title">Sign in to view your orders</h2>
+        <p className="orders-empty__text">You need to be logged in to access customer orders.</p>
+        <button type="button" className="orders-empty__btn" onClick={onAuthOpen}>
+          Sign in / Log in
+        </button>
+      </div>
+    );
+  }
+
+  if (isAdminUser(user)) {
+    return (
+      <div className="orders-empty">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#aa6d27" strokeWidth="1.5" aria-hidden>
+          <path d="M3 21h18"/>
+          <path d="M5 21V7l8-4 6 4v14"/>
+          <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
+        </svg>
+        <h2 className="orders-page__title">Admins do not have customer orders</h2>
+        <p className="orders-empty__text">
+          Admin accounts are limited to management work. Review storefront orders inside the admin panel instead.
+        </p>
+        <Link to="/admin?section=orders" className="orders-empty__btn orders-empty__btn-link">
+          Open Order Management
+        </Link>
+      </div>
+    );
+  }
 
   const filtered = ORDERS.filter((o) => {
     const matchTab =

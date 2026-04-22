@@ -33,6 +33,20 @@ export type AdminSettings = {
   emailCampaigns: boolean;
 };
 
+export type AdminAccountProfile = {
+  accountId: string;
+  contactNumber: string;
+  createdAt: string | null;
+  displayName: string;
+  email: string;
+  firstName: string;
+  lastLogin: string | null;
+  lastName: string;
+  middleName: string;
+  role: "admin" | "customer";
+  status: string;
+};
+
 export type RevenuePoint = {
   month: string;
   revenue: number;
@@ -117,5 +131,31 @@ export async function updateAdminSettings(settings: AdminSettings) {
   return request<{ ok: true; settings: AdminSettings }>("/api/admin/settings", {
     method: "PUT",
     body: JSON.stringify(settings),
+  });
+}
+
+export async function fetchAdminAccount() {
+  return request<{ ok: true; account: AdminAccountProfile }>("/api/auth/account");
+}
+
+export async function updateAdminAccount(payload: {
+  contactNumber: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
+}) {
+  return request<{ ok: true; account: AdminAccountProfile }>("/api/auth/account", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function changeAdminPassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  return request<{ ok: true }>("/api/auth/password", {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }

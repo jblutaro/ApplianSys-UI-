@@ -2,6 +2,7 @@ import "@/shared/styles/Admin.css";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { AppUser } from "@/shared/lib/auth";
 import { AdminAccessState } from "../components/AdminAccessState";
+import { AdminAccountSection } from "../components/AdminAccountSection";
 import { DashboardSection } from "../components/DashboardSection";
 import { OrdersSection } from "../components/OrdersSection";
 import { ProductsSection } from "../components/ProductsSection";
@@ -47,7 +48,7 @@ function renderSectionContent({
           onChangeStatus={state.handleOrderStatusChange}
         />
       );
-    case "settings":
+    case "platform":
       return (
         <SettingsSection
           settings={state.settings}
@@ -56,6 +57,8 @@ function renderSectionContent({
           isSaving={state.isSavingSettings}
         />
       );
+    case "settings":
+      return <AdminAccountSection enabled />;
     case "dashboard":
     default:
       return (
@@ -87,7 +90,7 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
     return (
       <AdminAccessState
         title="Admin sign-in required"
-        body="Sign in with your admin account to manage products, orders, reports, and platform settings."
+        body="Sign in with your admin account to manage products, orders, reports, and platform controls."
         actionLabel="Sign in"
         onAction={onAuthOpen}
         showBackLink
