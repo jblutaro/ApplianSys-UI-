@@ -43,6 +43,14 @@ export type RevenuePoint = {
   revenue: number;
 };
 
+export type ItemSalesRow = {
+  productId: number;
+  productName: string;
+  quantitySold: number;
+  averageUnitPrice: number;
+  grossSales: number;
+};
+
 export type SalesReportRow = {
   label: string;
   orders: number;

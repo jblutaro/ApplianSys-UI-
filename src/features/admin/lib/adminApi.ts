@@ -32,6 +32,7 @@ export type AdminSettings = {
   supportEmail: string;
   description: string;
   currency: string;
+  baseDeliveryFee: number;
   deliveryRatePerKm: number;
   taxRate: number;
   maintenanceMode: boolean;
@@ -71,6 +72,14 @@ export type RevenuePoint = {
   revenue: number;
 };
 
+export type ItemSalesRow = {
+  productId: number;
+  productName: string;
+  quantitySold: number;
+  averageUnitPrice: number;
+  grossSales: number;
+};
+
 export type SalesReportRow = {
   label: string;
   orders: number;
@@ -84,6 +93,7 @@ export type DashboardPayload = {
   settings: AdminSettings;
   revenueOverTime: RevenuePoint[];
   report: SalesReportRow[];
+  itemSales: ItemSalesRow[];
 };
 
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
@@ -116,9 +126,13 @@ export async function fetchAdminDashboard(period: ReportPeriod) {
 }
 
 export async function fetchSalesReport(period: ReportPeriod) {
-  return request<{ ok: true; period: ReportPeriod; report: SalesReportRow[]; orders: Order[] }>(
-    `/api/admin/reports/sales?period=${period}`,
-  );
+  return request<{
+    ok: true;
+    period: ReportPeriod;
+    report: SalesReportRow[];
+    itemSales: ItemSalesRow[];
+    orders: Order[];
+  }>(`/api/admin/reports/sales?period=${period}`);
 }
 
 export async function createProduct(payload: {

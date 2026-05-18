@@ -1,8 +1,11 @@
 import "@/shared/styles/Admin.css";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { AppUser } from "@/shared/lib/auth";
 import { AdminAccessState } from "../components/AdminAccessState";
 import { AdminAccountSection } from "../components/AdminAccountSection";
+import { CategoryManagerModal } from "../components/CategoryManagerModal";
+import { CreateProductModal } from "../components/CreateProductModal";
 import { DashboardSection } from "../components/DashboardSection";
 import { OrdersSection } from "../components/OrdersSection";
 import { ProductsSection } from "../components/ProductsSection";
@@ -10,7 +13,6 @@ import { SettingsSection } from "../components/SettingsSection";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { isAdminUser } from "../lib/adminAccess";
 import { NAV_ITEMS, type AdminSection } from "../lib/adminConstants";
-import { downloadExcelReport } from "../lib/adminUtils";
 
 type AdminPageProps = {
   user: AppUser | null;
@@ -34,11 +36,11 @@ function getSection(sectionParam: string | null, navItems: typeof NAV_ITEMS): Ad
 function renderSectionContent({
   section,
   state,
-  user,
+  onEditProduct,
 }: {
   section: AdminSection;
   state: ReturnType<typeof useAdminDashboard>;
-  user: AppUser;
+  onEditProduct: (id: string) => void;
 }) {
   switch (section) {
     case "products":
@@ -46,20 +48,8 @@ function renderSectionContent({
         <ProductsSection
           products={state.products}
           categories={state.categories}
-          categoryDraft={state.categoryDraft}
-          draft={state.productDraft}
-          setDraft={state.setProductDraft}
-          setCategoryDraft={state.setCategoryDraft}
-          onAddProduct={state.handleAddProduct}
-          onAddCategory={state.handleAddCategory}
-          onAddSubSubcategory={state.handleAddSubSubcategory}
-          onCancelEdit={state.handleCancelEditProduct}
           onDeleteProduct={state.handleDeleteProduct}
-          onDeleteSubcategory={state.handleDeleteSubcategory}
-          onDeleteSubSubcategory={state.handleDeleteSubSubcategory}
-          onEditProduct={state.handleEditProduct}
-          isEditing={state.editingProductId !== null}
-          canManageCategories={user.role === "admin"}
+          onEditProduct={onEditProduct}
         />
       );
     case "orders":
@@ -90,6 +80,7 @@ function renderSectionContent({
           setPeriod={state.setPeriod}
           revenueOverTime={state.revenueOverTime}
           reportRows={state.reportRows}
+          itemSalesRows={state.itemSalesRows}
         />
       );
   }
@@ -98,10 +89,11 @@ function renderSectionContent({
 function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const isAllowed = isAdminUser(user);
 
-  const state = useAdminDashboard({
-    enabled: Boolean(user && isAllowed),
+  const state = useAdminDashboard({    enabled: Boolean(user && isAllowed),
   });
 
   if (!user) {
@@ -145,7 +137,9 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
       <aside className="admin-sidebar">
         <div className="admin-sidebar__top">
           <div className="admin-brand">
-            <h1 className="admin-brand__title">ApplianSys Panel</h1>
+            <div className="admin-brand__row">
+              <h1 className="admin-brand__title">ApplianSys Panel</h1>
+            </div>
             <span className="admin-brand__text">
               Control the storefront, orders, products, and account tools.
             </span>
@@ -158,8 +152,9 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
                 type="button"
                 className={`admin-sidebar__link${section === item.key ? " admin-sidebar__link--active" : ""}`}
                 onClick={() => setSearchParams({ section: item.key })}
+                title={item.label}
               >
-                {item.label}
+                <span className="admin-sidebar__link-label">{item.label}</span>
               </button>
             ))}
           </nav>
@@ -171,8 +166,8 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
             <span className="admin-sidebar__user-value">{user.email}</span>
           </div>
 
-          <Link to="/" className="admin-sidebar__back">
-            Back to Storefront
+          <Link to="/" className="admin-sidebar__back" title="Back to Storefront">
+            <span className="admin-sidebar__link-label">Back to Storefront</span>
           </Link>
         </div>
       </aside>
@@ -190,15 +185,22 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
             <span className="admin-chip">
               {state.settings.maintenanceMode ? "Maintenance mode on" : "Storefront live"}
             </span>
-            {section === "dashboard" ? (
+            {section === "products" ? (
               <button
                 type="button"
                 className="admin-primary-btn"
-                onClick={() =>
-                  downloadExcelReport(state.period, state.orders, state.reportRows)
-                }
+                onClick={() => setIsProductModalOpen(true)}
               >
-                Export Excel Report
+                + Add Product
+              </button>
+            ) : null}
+            {section === "products" && user.role === "admin" ? (
+              <button
+                type="button"
+                className="admin-secondary-btn"
+                onClick={() => setIsCategoryModalOpen(true)}
+              >
+                Add Category
               </button>
             ) : null}
           </div>
@@ -216,10 +218,42 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
           </div>
         ) : null}
 
-        {renderSectionContent({ section, state, user })}
+        {renderSectionContent({ section, state, onEditProduct: (id) => {
+          state.handleEditProduct(id);
+          setIsProductModalOpen(true);
+        } })}
+
+        <CreateProductModal
+          isOpen={isProductModalOpen}
+          onClose={() => {
+            setIsProductModalOpen(false);
+            state.handleCancelEditProduct();
+          }}
+          draft={state.productDraft}
+          setDraft={state.setProductDraft}
+          categories={state.categories}
+          isEditing={state.editingProductId !== null}
+          onAddProduct={state.handleAddProduct}
+          onCancelEdit={state.handleCancelEditProduct}
+        />
+
+        {user.role === "admin" ? (
+          <CategoryManagerModal
+            isOpen={isCategoryModalOpen}
+            onClose={() => setIsCategoryModalOpen(false)}
+            categories={state.categories}
+            categoryDraft={state.categoryDraft}
+            setCategoryDraft={state.setCategoryDraft}
+            onAddCategory={state.handleAddCategory}
+            onAddSubSubcategory={state.handleAddSubSubcategory}
+            onDeleteSubcategory={state.handleDeleteSubcategory}
+            onDeleteSubSubcategory={state.handleDeleteSubSubcategory}
+          />
+        ) : null}
       </main>
     </div>
   );
 }
 
 export default AdminPage;
+

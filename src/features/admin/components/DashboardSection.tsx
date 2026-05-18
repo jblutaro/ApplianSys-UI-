@@ -3,14 +3,16 @@ import type {
   Product,
   ReportPeriod,
   RevenuePoint,
+  ItemSalesRow,
   SalesReportRow,
 } from "../lib/adminApi";
-import { downloadExcelReport, formatCurrency } from "../lib/adminUtils";
+import { downloadExcelReport, downloadPdfReport, formatCurrency } from "../lib/adminUtils";
 
 type DashboardSectionProps = {
   orders: Order[];
   period: ReportPeriod;
   products: Product[];
+  itemSalesRows: ItemSalesRow[];
   reportRows: SalesReportRow[];
   revenueOverTime: RevenuePoint[];
   setPeriod: (value: ReportPeriod) => void;
@@ -20,6 +22,7 @@ export function DashboardSection({
   orders,
   period,
   products,
+  itemSalesRows,
   reportRows,
   revenueOverTime,
   setPeriod,
@@ -29,6 +32,9 @@ export function DashboardSection({
   const activeProducts = products.filter((product) => product.status === "Active").length;
   const lowInventory = products.filter((product) => product.status !== "Active").length;
   const maxRevenue = Math.max(1, ...revenueOverTime.map((item) => item.revenue));
+  const chartScale = maxRevenue * 1.25;
+  const totalUnitsSold = itemSalesRows.reduce((sum, item) => sum + item.quantitySold, 0);
+  const totalItemSales = itemSalesRows.reduce((sum, item) => sum + item.grossSales, 0);
 
   return (
     <>
@@ -68,26 +74,39 @@ export function DashboardSection({
             </div>
           </div>
 
-          <div className="admin-chart">
-            {revenueOverTime.map((item) => (
-              <div key={item.month} className="admin-chart__col">
-                <div className="admin-chart__bar-wrap">
-                  <div
-                    className={`admin-chart__bar${item.revenue === maxRevenue ? " admin-chart__bar--highlight" : ""}`}
-                    style={{ height: `${(item.revenue / maxRevenue) * 100}%` }}
-                  />
+          {revenueOverTime.length === 0 ? (
+            <div className="admin-chart-empty">
+              <span>No order data yet.</span>
+            </div>
+          ) : (
+            <div className="admin-chart">
+              {revenueOverTime.map((item) => (
+                <div key={item.month} className="admin-chart__col">
+                  <div className="admin-chart__bar-wrap">
+                    {item.revenue > 0 ? (
+                      <span className="admin-chart__bar-value">
+                        {formatCurrency(item.revenue)}
+                      </span>
+                    ) : null}
+                    <div
+                      className={`admin-chart__bar${item.revenue === maxRevenue ? " admin-chart__bar--highlight" : ""}`}
+                      style={{ height: `${(item.revenue / chartScale) * 100}%` }}
+                    />
+                  </div>
+                  <span className="admin-chart__label">{item.month}</span>
                 </div>
-                <span className="admin-chart__label">{item.month}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </article>
 
         <article className="admin-card">
           <div className="admin-card__header">
             <div>
               <h2 className="admin-card__title">Sales Report</h2>
-              <p className="admin-card__sub">Export the selected sales report as an Excel file.</p>
+              <p className="admin-card__sub">
+                Export the selected sales report, including item totals, as an Excel file.
+              </p>
             </div>
           </div>
 
@@ -105,9 +124,19 @@ export function DashboardSection({
             <button
               type="button"
               className="admin-secondary-btn"
-              onClick={() => downloadExcelReport(period, orders, reportRows)}
+              onClick={() => {
+                void downloadExcelReport(period, reportRows, itemSalesRows);
+              }}
             >
-              Export Report
+              Export Excel
+            </button>
+
+            <button
+              type="button"
+              className="admin-secondary-btn"
+              onClick={() => downloadPdfReport(period, orders, reportRows, itemSalesRows)}
+            >
+              Export PDF
             </button>
           </div>
 
@@ -130,6 +159,52 @@ export function DashboardSection({
                     <td className="admin-table__strong">{formatCurrency(row.grossRevenue)}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article className="admin-card admin-card--wide">
+          <div className="admin-card__header">
+            <div>
+              <h2 className="admin-card__title">Items Sold</h2>
+              <p className="admin-card__sub">
+                Individual product totals for the selected report period.
+              </p>
+            </div>
+          </div>
+
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Item Sold</th>
+                  <th>Units Sold</th>
+                  <th>Average Price</th>
+                  <th>Total Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemSalesRows.length > 0 ? (
+                  itemSalesRows.map((item) => (
+                    <tr key={item.productId}>
+                      <td>{item.productName}</td>
+                      <td>{item.quantitySold}</td>
+                      <td>{formatCurrency(item.averageUnitPrice)}</td>
+                      <td className="admin-table__strong">{formatCurrency(item.grossSales)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4}>No items sold for this period.</td>
+                  </tr>
+                )}
+                <tr>
+                  <td className="admin-table__strong">Grand Total Sold by System</td>
+                  <td className="admin-table__strong">{totalUnitsSold}</td>
+                  <td />
+                  <td className="admin-table__strong">{formatCurrency(totalItemSales)}</td>
+                </tr>
               </tbody>
             </table>
           </div>

@@ -25,9 +25,10 @@ function formatCurrency(value: number) {
 }
 
 function CategoryPage() {
-  const { categorySlug, subSlug } = useParams<{
+  const { categorySlug, subSlug, subSubSlug } = useParams<{
     categorySlug: string;
     subSlug?: string;
+    subSubSlug?: string;
   }>();
   const [sortBy, setSortBy] = useState("popularity");
   const [perPage, setPerPage] = useState(6);
@@ -68,26 +69,27 @@ function CategoryPage() {
 
   const category = categories.find((item) => slugify(item.name) === categorySlug);
   const activeSub = category?.subcategories.find((item) => slugify(item.name) === subSlug);
+  const activeSubSub = activeSub?.subSubcategories.find((item) => slugify(item.name) === subSubSlug);
+
   const categoryProducts = useMemo(
     () => (category ? products.filter((product) => slugify(product.category) === slugify(category.name)) : []),
     [category, products],
   );
+
   const visibleProducts = useMemo(() => {
-    const filtered = activeSub
-      ? categoryProducts.filter((product) => slugify(product.subcategory) === slugify(activeSub.name))
-      : categoryProducts;
-    const sorted = [...filtered];
-
-    if (sortBy === "price-asc") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else if (sortBy === "price-desc") {
-      sorted.sort((a, b) => b.price - a.price);
-    } else if (sortBy === "newest") {
-      sorted.sort((a, b) => b.dbId - a.dbId);
+    let filtered = categoryProducts;
+    if (activeSub) {
+      filtered = filtered.filter((p) => slugify(p.subcategory) === slugify(activeSub.name));
     }
-
+    if (activeSubSub) {
+      filtered = filtered.filter((p) => slugify(p.subSubcategory) === slugify(activeSubSub.name));
+    }
+    const sorted = [...filtered];
+    if (sortBy === "price-asc") sorted.sort((a, b) => a.price - b.price);
+    else if (sortBy === "price-desc") sorted.sort((a, b) => b.price - a.price);
+    else if (sortBy === "newest") sorted.sort((a, b) => b.dbId - a.dbId);
     return sorted.slice(0, perPage);
-  }, [activeSub, categoryProducts, perPage, sortBy]);
+  }, [activeSub, activeSubSub, categoryProducts, perPage, sortBy]);
 
   if (!isLoading && !category) {
     return (
@@ -98,13 +100,15 @@ function CategoryPage() {
     );
   }
 
-  const pageTitle = activeSub ? activeSub.name : category?.name ?? "Category";
+  const pageTitle = activeSubSub?.name ?? activeSub?.name ?? category?.name ?? "Category";
+  const catBase = category ? `/category/${slugify(category.name)}` : "/";
+  const subBase = activeSub ? `${catBase}/${slugify(activeSub.name)}` : catBase;
+
   const crumbs = [
     { label: "Home", to: "/" },
-    ...(category ? [{ label: category.name, to: `/category/${slugify(category.name)}` }] : []),
-    ...(category && activeSub
-      ? [{ label: activeSub.name, to: `/category/${slugify(category.name)}/${slugify(activeSub.name)}` }]
-      : []),
+    ...(category ? [{ label: category.name, to: catBase }] : []),
+    ...(activeSub ? [{ label: activeSub.name, to: subBase }] : []),
+    ...(activeSubSub ? [{ label: activeSubSub.name, to: `${subBase}/${slugify(activeSubSub.name)}` }] : []),
   ];
 
   return (
@@ -159,12 +163,54 @@ function CategoryPage() {
               <ul className="cat-sidebar__list">
                 {category.subcategories.map((sub) => {
                   const subcategorySlug = slugify(sub.name);
-                  const isActive = subcategorySlug === subSlug;
+                  const isSubActive = subcategorySlug === subSlug;
+                  const hasChildren = sub.subSubcategories.length > 0;
+
+                  if (hasChildren) {
+                    return (
+                      <li key={sub.id}>
+                        <details
+                          className="cat-sidebar__sub-dropdown"
+                          open={isSubActive}
+                        >
+                          <summary
+                            className={`cat-sidebar__item cat-sidebar__item--expandable${isSubActive ? " cat-sidebar__item--active" : ""}`}
+                          >
+                            <Link
+                              to={`/category/${slugify(category.name)}/${subcategorySlug}`}
+                              className="cat-sidebar__item-link"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {sub.name}
+                            </Link>
+                            <span className="cat-sidebar__sub-chevron" aria-hidden="true">&#8964;</span>
+                          </summary>
+                          <ul className="cat-sidebar__sub-list">
+                            {sub.subSubcategories.map((ss) => {
+                              const ssSlug = slugify(ss.name);
+                              const isSsActive = ssSlug === subSubSlug && isSubActive;
+                              return (
+                                <li key={ss.id}>
+                                  <Link
+                                    to={`/category/${slugify(category.name)}/${subcategorySlug}/${ssSlug}`}
+                                    className={`cat-sidebar__item cat-sidebar__item--sub${isSsActive ? " cat-sidebar__item--active" : ""}`}
+                                  >
+                                    {ss.name}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </details>
+                      </li>
+                    );
+                  }
+
                   return (
                     <li key={sub.id}>
                       <Link
                         to={`/category/${slugify(category.name)}/${subcategorySlug}`}
-                        className={`cat-sidebar__item${isActive ? " cat-sidebar__item--active" : ""}`}
+                        className={`cat-sidebar__item${isSubActive ? " cat-sidebar__item--active" : ""}`}
                       >
                         {sub.name}
                       </Link>

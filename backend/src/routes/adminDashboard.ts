@@ -2,7 +2,7 @@ import { Router } from "express";
 import { readAdminSettings } from "../data/adminSettingsStore.js";
 import { getOrders } from "../services/admin/orders.js";
 import { getProducts } from "../services/admin/products.js";
-import { getRevenueSeries, getSalesReport } from "../services/admin/reports.js";
+import { getItemSalesReport, getRevenueSeries, getSalesReport } from "../services/admin/reports.js";
 import type { ReportPeriod } from "../services/admin/types.js";
 
 export const adminDashboardRouter = Router();
@@ -17,7 +17,10 @@ adminDashboardRouter.get("/dashboard", async (req, res, next) => {
       getRevenueSeries(),
     ]);
 
-    const report = await getSalesReport(period, settings.taxRate);
+    const [report, itemSales] = await Promise.all([
+      getSalesReport(period, settings.taxRate),
+      getItemSalesReport(period),
+    ]);
 
     res.json({
       ok: true,
@@ -27,6 +30,7 @@ adminDashboardRouter.get("/dashboard", async (req, res, next) => {
         settings,
         revenueOverTime,
         report,
+        itemSales,
       },
     });
   } catch (error) {
@@ -38,12 +42,16 @@ adminDashboardRouter.get("/reports/sales", async (req, res, next) => {
   try {
     const period = (req.query.period as ReportPeriod | undefined) ?? "monthly";
     const [orders, settings] = await Promise.all([getOrders(), readAdminSettings()]);
-    const report = await getSalesReport(period, settings.taxRate);
+    const [report, itemSales] = await Promise.all([
+      getSalesReport(period, settings.taxRate),
+      getItemSalesReport(period),
+    ]);
 
     res.json({
       ok: true,
       period,
       report,
+      itemSales,
       orders,
     });
   } catch (error) {

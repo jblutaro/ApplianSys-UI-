@@ -76,6 +76,19 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCustomer]);
 
+  useEffect(() => {
+    const handleCheckoutCompleted = (event: StorageEvent) => {
+      if (event.key !== "appliansys:checkout-completed") return;
+
+      setCheckoutOpen(false);
+      void Promise.resolve().then(loadCart);
+    };
+
+    window.addEventListener("storage", handleCheckoutCompleted);
+    return () => window.removeEventListener("storage", handleCheckoutCompleted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCustomer]);
+
   const setPending = (productId: number, pending: boolean) => {
     setPendingIds((prev) => {
       const next = new Set(prev);

@@ -90,6 +90,22 @@ export function SettingsSection({
               onChange={(event) => setSettings({ ...settings, deliveryRatePerKm: Number(event.target.value) })}
             />
           </div>
+
+          <div className="admin-field">
+            <label htmlFor="base-delivery-fee">Base Delivery Fee (₱)</label>
+            <input
+              id="base-delivery-fee"
+              className="admin-input"
+              type="number"
+              min="0"
+              step="1"
+              value={settings.baseDeliveryFee}
+              onChange={(event) => setSettings({ ...settings, baseDeliveryFee: Number(event.target.value) })}
+            />
+            <span className="admin-field-hint">
+              Flat fee charged on every delivery order, before the per-km rate is added.
+            </span>
+          </div>
         </div>
 
         <button type="button" className="admin-primary-btn" onClick={onSave} disabled={isSaving}>

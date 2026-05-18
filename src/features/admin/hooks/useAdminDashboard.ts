@@ -17,6 +17,7 @@ import {
   type Product,
   type ReportPeriod,
   type RevenuePoint,
+  type ItemSalesRow,
   type SalesReportRow,
   type AdminSettings,
   type CategoryOption,
@@ -40,6 +41,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
   const [settings, setSettings] = useState<AdminSettings>(EMPTY_SETTINGS);
   const [revenueOverTime, setRevenueOverTime] = useState<RevenuePoint[]>([]);
   const [reportRows, setReportRows] = useState<SalesReportRow[]>([]);
+  const [itemSalesRows, setItemSalesRows] = useState<ItemSalesRow[]>([]);
   const [period, setPeriod] = useState<ReportPeriod>("monthly");
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -69,6 +71,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
         setSettings(response.dashboard.settings);
         setRevenueOverTime(response.dashboard.revenueOverTime);
         setReportRows(response.dashboard.report);
+        setItemSalesRows(response.dashboard.itemSales);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load admin data.");
@@ -228,6 +231,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
 
         const reportResponse = await fetchSalesReport(period);
         setReportRows(reportResponse.report);
+        setItemSalesRows(reportResponse.itemSales);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Failed to save settings.");
       } finally {
@@ -257,6 +261,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
     period,
     productDraft,
     products,
+    itemSalesRows,
     reportRows,
     revenueOverTime,
     setPeriod,

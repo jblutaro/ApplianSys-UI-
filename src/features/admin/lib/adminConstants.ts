@@ -67,6 +67,7 @@ export const EMPTY_SETTINGS: AdminSettings = {
   supportEmail: "support@appliansys.com",
   description: "Premium appliances for every household.",
   currency: "PHP (PHP)",
+  baseDeliveryFee: 50,
   deliveryRatePerKm: 7.51,
   taxRate: 8.5,
   maintenanceMode: false,

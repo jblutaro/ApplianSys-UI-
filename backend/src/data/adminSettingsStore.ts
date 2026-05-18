@@ -6,6 +6,7 @@ export type AdminSettings = {
   supportEmail: string;
   description: string;
   currency: string;
+  baseDeliveryFee: number;
   deliveryRatePerKm: number;
   taxRate: number;
   maintenanceMode: boolean;
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   supportEmail: "support@appliansys.com",
   description: "Premium appliances for every household.",
   currency: "PHP (PHP)",
+  baseDeliveryFee: 50,
   deliveryRatePerKm: 7.51,
   taxRate: 8.5,
   maintenanceMode: false,
@@ -49,6 +51,9 @@ export async function writeAdminSettings(settings: AdminSettings) {
   const nextSettings = {
     ...DEFAULT_SETTINGS,
     ...settings,
+    baseDeliveryFee: Number.isFinite(Number(settings.baseDeliveryFee))
+      ? Math.max(0, Number(settings.baseDeliveryFee))
+      : DEFAULT_SETTINGS.baseDeliveryFee,
     deliveryRatePerKm: Number.isFinite(Number(settings.deliveryRatePerKm))
       ? Math.max(0, Number(settings.deliveryRatePerKm))
       : DEFAULT_SETTINGS.deliveryRatePerKm,

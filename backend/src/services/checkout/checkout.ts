@@ -48,7 +48,6 @@ export const OLD_ALBAY_SHOP_LOCATION = {
   lat: 13.1391,
   lng: 123.7438,
 };
-const BASE_DELIVERY_FEE = 50;
 
 export function calculateDistanceKm(
   first: { lat: number; lng: number },
@@ -170,7 +169,7 @@ export async function placeOrder(
       : 0;
   const deliveryFee =
     input.fulfillment.method === "delivery"
-      ? roundMoney(BASE_DELIVERY_FEE + deliveryDistanceKm * settings.deliveryRatePerKm)
+      ? roundMoney((settings.baseDeliveryFee ?? 50) + deliveryDistanceKm * settings.deliveryRatePerKm)
       : 0;
   const totalAmount = subtotal + deliveryFee;
 

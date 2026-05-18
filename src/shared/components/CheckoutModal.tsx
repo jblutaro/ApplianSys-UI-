@@ -27,7 +27,6 @@ L.Icon.Default.mergeOptions({
 /* ── Types ── */
 type Method = "delivery" | "pickup";
 type Step = 1 | 2 | 3 | 4;
-type GcashStage = "login" | "otp" | "pay" | "receipt";
 
 type AddressForm = {
   street: string;
@@ -114,12 +113,16 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function generateMockOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
+function createMockGcashSessionId() {
+  const browserCrypto = globalThis.crypto;
 
-function generateGcashReceiptRef() {
-  return `GC${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+  if (browserCrypto.randomUUID) {
+    return browserCrypto.randomUUID();
+  }
+
+  const values = new Uint32Array(2);
+  browserCrypto.getRandomValues(values);
+  return `mock-gcash-${values[0].toString(16)}-${values[1].toString(16)}`;
 }
 
 async function reverseGeocodeLocation(lat: number, lng: number): Promise<Partial<AddressForm>> {
@@ -246,12 +249,6 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
-  const [gcashStage, setGcashStage] = useState<GcashStage | null>(null);
-  const [gcashPhone, setGcashPhone] = useState("");
-  const [gcashOtp, setGcashOtp] = useState("");
-  const [gcashGeneratedOtp, setGcashGeneratedOtp] = useState("");
-  const [gcashReceiptRef, setGcashReceiptRef] = useState("");
-  const [gcashError, setGcashError] = useState("");
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const deliveryDistanceKm =
@@ -260,8 +257,6 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const total = subtotal + shipping;
   const deliveryLocationInAlbay = isWithinAlbayDeliveryArea(lat, lng);
   const lookupRequestId = useRef(0);
-  const isGcashGate = gcashStage !== null;
-  const normalizedGcashPhone = gcashPhone.replace(/\D/g, "");
 
   useEffect(() => {
     void (async () => {
@@ -339,52 +334,36 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         } satisfies FulfillmentDelivery)
       : { method: "pickup" as const };
 
-  const startGcashLogin = () => {
-    setGcashError("");
-    setGcashStage("login");
-  };
-
-  const handleGcashLogin = () => {
-    if (!/^09\d{9}$/.test(normalizedGcashPhone)) {
-      setGcashError("Enter a valid 11-digit GCash mobile number starting with 09.");
-      return;
-    }
-
-    setGcashError("");
-    setGcashGeneratedOtp(generateMockOtp());
-    setGcashOtp("");
-    setGcashStage("otp");
-  };
-
-  const handleGcashOtp = () => {
-    if (gcashOtp.trim() !== gcashGeneratedOtp) {
-      setGcashError("Invalid mock OTP. Use the generated code shown on this screen.");
-      return;
-    }
-
-    setGcashError("");
-    setGcashStage("pay");
-  };
-
-  const handleGcashPayment = async () => {
+  const openMockGcashGateway = () => {
     if (method === "delivery" && !deliveryLocationInAlbay) {
-      setGcashError("ApplianSys can only deliver within Albay. Please select a location inside Albay or choose pickup.");
+      setSubmitError("ApplianSys can only deliver within Albay. Please select a location inside Albay or choose pickup.");
       return;
     }
 
-    setSubmitting(true);
-    setGcashError("");
-    try {
-      const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
-      setPlacedOrder(order);
-      setGcashReceiptRef(generateGcashReceiptRef());
-      onSuccess();
-      setGcashStage("receipt");
-    } catch (err) {
-      setGcashError(err instanceof Error ? err.message : "Failed to complete mock GCash payment.");
-    } finally {
-      setSubmitting(false);
+    const sessionId = createMockGcashSessionId();
+
+    localStorage.setItem(
+      `appliansys:mock-gcash:${sessionId}`,
+      JSON.stringify({
+        createdAt: new Date().toISOString(),
+        fulfillment: buildFulfillment(),
+        paymentMethod: "GCash",
+        sessionId,
+        shipping,
+        subtotal,
+        total,
+      }),
+    );
+
+    const gatewayUrl = `/mock-gcash-payment?session=${encodeURIComponent(sessionId)}`;
+    const paymentWindow = window.open(gatewayUrl, "_blank", "noopener,noreferrer");
+
+    if (!paymentWindow) {
+      setSubmitError("Popup blocked. Please allow popups and try GCash again.");
+      return;
     }
+
+    setSubmitError("Mock GCash payment opened in a new tab.");
   };
 
   /* ── Submit ── */
@@ -428,7 +407,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         {/* Header */}
         <div className="checkout-sheet__header">
           <h2 className="checkout-sheet__title">
-            {isGcashGate ? "Mock GCash Payment" : step === 4 ? "Order Placed!" : "Checkout"}
+            {step === 4 ? "Order Placed!" : "Checkout"}
           </h2>
           {step !== 4 && (
             <button type="button" className="checkout-sheet__close" onClick={onClose} aria-label="Close checkout">
@@ -438,7 +417,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         </div>
 
         {/* Step indicator */}
-        {step !== 4 && !isGcashGate && (
+        {step !== 4 && (
           <div className="checkout-steps" aria-label="Checkout progress">
             {STEPS.map((s, idx) => {
               const isDone = step > s.num;
@@ -468,105 +447,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         <div className="checkout-sheet__body">
 
           {/* ── STEP 1: Method ── */}
-          {isGcashGate && (
-            <div className="gcash-gateway">
-              <div className="gcash-gateway__brand">
-                <span>GCash</span>
-                <small>Mock payment gateway</small>
-              </div>
-
-              {gcashStage === "login" ? (
-                <div className="gcash-card">
-                  <h3>Log in to your GCash account</h3>
-                  <p>This is a mock payment method for testing checkout only.</p>
-                  <label htmlFor="gcash-phone">Mobile number</label>
-                  <input
-                    id="gcash-phone"
-                    className="gcash-input"
-                    inputMode="numeric"
-                    maxLength={11}
-                    placeholder="09XXXXXXXXX"
-                    value={gcashPhone}
-                    onChange={(event) => setGcashPhone(event.target.value)}
-                  />
-                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
-                  <button type="button" className="gcash-btn" onClick={handleGcashLogin}>
-                    Continue
-                  </button>
-                </div>
-              ) : null}
-
-              {gcashStage === "otp" ? (
-                <div className="gcash-card">
-                  <h3>Enter OTP</h3>
-                  <p>Mock OTP sent to {normalizedGcashPhone}. Use code <strong>{gcashGeneratedOtp}</strong>.</p>
-                  <label htmlFor="gcash-otp">One-time PIN</label>
-                  <input
-                    id="gcash-otp"
-                    className="gcash-input gcash-input--otp"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={gcashOtp}
-                    onChange={(event) => setGcashOtp(event.target.value)}
-                  />
-                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
-                  <button type="button" className="gcash-btn" onClick={handleGcashOtp}>
-                    Verify OTP
-                  </button>
-                </div>
-              ) : null}
-
-              {gcashStage === "pay" ? (
-                <div className="gcash-card">
-                  <h3>Confirm Payment</h3>
-                  <div className="gcash-amount">{formatCurrency(total)}</div>
-                  <div className="gcash-summary">
-                    <span>Merchant</span>
-                    <strong>ApplianSys</strong>
-                    <span>Subtotal</span>
-                    <strong>{formatCurrency(subtotal)}</strong>
-                    <span>Shipping</span>
-                    <strong>{method === "delivery" ? formatCurrency(shipping) : "Free"}</strong>
-                  </div>
-                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
-                  <button type="button" className="gcash-btn" onClick={() => void handleGcashPayment()} disabled={submitting}>
-                    {submitting ? "Processing..." : "Pay Now"}
-                  </button>
-                </div>
-              ) : null}
-
-              {gcashStage === "receipt" && placedOrder ? (
-                <div className="gcash-card gcash-card--receipt">
-                  <div className="gcash-receipt-check">✓</div>
-                  <h3>Payment Successful</h3>
-                  <p>Your mock GCash payment has been confirmed.</p>
-                  <div className="gcash-summary">
-                    <span>Receipt No.</span>
-                    <strong>{gcashReceiptRef}</strong>
-                    <span>Order Ref.</span>
-                    <strong>{placedOrder.orderRef}</strong>
-                    <span>Paid Amount</span>
-                    <strong>{formatCurrency(placedOrder.totalAmount)}</strong>
-                    <span>Mobile No.</span>
-                    <strong>{normalizedGcashPhone}</strong>
-                  </div>
-                  <button
-                    type="button"
-                    className="gcash-btn"
-                    onClick={() => {
-                      onClose();
-                      void navigate("/orders");
-                    }}
-                  >
-                    View My Orders
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {!isGcashGate && step === 1 && (
+          {step === 1 && (
             <>
               <p className="checkout-section-label">How would you like to receive your order?</p>
               <div className="checkout-method-grid">
@@ -610,7 +491,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           )}
 
           {/* ── STEP 2: Details ── */}
-          {!isGcashGate && step === 2 && method === "delivery" && (
+          {step === 2 && method === "delivery" && (
             <>
               <p className="checkout-section-label">Delivery Address</p>
               <div className="checkout-form-grid">
@@ -694,7 +575,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
             </>
           )}
 
-          {!isGcashGate && step === 2 && method === "pickup" && (
+          {step === 2 && method === "pickup" && (
             <>
               <p className="checkout-section-label">Pickup Location</p>
               <div className="checkout-pickup-info">
@@ -717,7 +598,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           )}
 
           {/* Payment method — shown on step 2 */}
-          {!isGcashGate && step === 2 && (
+          {step === 2 && (
             <>
               <p className="checkout-section-label" style={{ marginTop: 24 }}>Payment Method</p>
               <div className="checkout-payment-options">
@@ -742,7 +623,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           )}
 
           {/* ── STEP 3: Review ── */}
-          {!isGcashGate && step === 3 && (
+          {step === 3 && (
             <>
               <p className="checkout-section-label">Order Items</p>
               <div className="checkout-review-items">
@@ -814,7 +695,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           )}
 
           {/* ── STEP 4: Success ── */}
-          {!isGcashGate && step === 4 && placedOrder && (
+          {step === 4 && placedOrder && (
             <div className="checkout-success">
               <div className="checkout-success__icon">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -844,7 +725,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         </div>
 
         {/* Footer */}
-        {step !== 4 && !isGcashGate && (
+        {step !== 4 && (
           <div className="checkout-sheet__footer">
             {step > 1 && (
               <button
@@ -864,7 +745,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 disabled={step === 2 && !canProceedStep2}
                 onClick={() => {
                   if (step === 2 && paymentMethod === "GCash") {
-                    startGcashLogin();
+                    openMockGcashGateway();
                     return;
                   }
 

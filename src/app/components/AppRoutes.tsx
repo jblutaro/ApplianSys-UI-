@@ -4,6 +4,7 @@ import { AdminPage } from "@/features/admin";
 import { CartPage } from "@/features/cart";
 import { CategoryPage } from "@/features/category";
 import { OrdersPage } from "@/features/orders";
+import MockGcashPage from "@/features/payment/pages/MockGcashPage";
 import { ProductDetailPage } from "@/features/product";
 import { SearchPage } from "@/features/search";
 import { SettingsPage } from "@/features/settings";
@@ -21,10 +22,12 @@ export function AppRoutes({ onAuthOpen, user }: AppRoutesProps) {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/cart" element={<CartPage user={user} onAuthOpen={onAuthOpen} />} />
       <Route path="/orders" element={<OrdersPage user={user} onAuthOpen={onAuthOpen} />} />
+      <Route path="/mock-gcash-payment" element={<MockGcashPage />} />
       <Route path="/settings" element={<SettingsPage user={user} onAuthOpen={onAuthOpen} />} />
       <Route path="/admin" element={<AdminPage user={user} onAuthOpen={onAuthOpen} />} />
       <Route path="/category/:categorySlug" element={<CategoryPage />} />
       <Route path="/category/:categorySlug/:subSlug" element={<CategoryPage />} />
+      <Route path="/category/:categorySlug/:subSlug/:subSubSlug" element={<CategoryPage />} />
       <Route path="/product/:productId" element={<ProductDetailPage />} />
     </Routes>
   );
