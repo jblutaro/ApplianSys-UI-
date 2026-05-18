@@ -3,6 +3,16 @@ import { buildLocalChatReply } from "./fallback.js";
 import { buildOpenAIMessages, extractReply } from "./messages.js";
 import type { ChatMessage } from "./types.js";
 
+async function logOpenAIError(response: Response) {
+  if (response.status === 429) {
+    console.warn("OpenAI quota or rate limit reached. Using local chatbot fallback.");
+    return;
+  }
+
+  const errorText = await response.text();
+  console.error(`OpenAI request failed (${response.status}): ${errorText}`);
+}
+
 export async function generateChatReply(messages: ChatMessage[]): Promise<string> {
   if (!env.openaiApiKey) {
     return buildLocalChatReply(messages);
@@ -23,7 +33,7 @@ export async function generateChatReply(messages: ChatMessage[]): Promise<string
     });
 
     if (!response.ok) {
-      console.error(`OpenAI request failed (${response.status}): ${await response.text()}`);
+      await logOpenAIError(response);
       return buildLocalChatReply(messages);
     }
 
