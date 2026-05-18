@@ -31,6 +31,7 @@ export type AdminOrder = {
   id: string;
   dbId: number;
   customer: string;
+  deliveryMethod: string;
   email: string;
   date: string;
   total: number;

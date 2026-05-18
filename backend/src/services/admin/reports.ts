@@ -13,7 +13,7 @@ export async function getRevenueSeries(): Promise<RevenuePoint[]> {
     SELECT
       MONTH(order_date) AS month_number,
       COALESCE(SUM(total_amount), 0) AS revenue
-    FROM \`ORDER\`
+    FROM orders
     WHERE order_date IS NOT NULL
     GROUP BY MONTH(order_date)
     ORDER BY MONTH(order_date)
@@ -44,7 +44,7 @@ export async function getSalesReport(
         WEEK(order_date, 1) AS bucket,
         COUNT(*) AS orders,
         COALESCE(SUM(total_amount), 0) AS gross_revenue
-      FROM \`ORDER\`
+      FROM orders
       WHERE order_date IS NOT NULL
       GROUP BY WEEK(order_date, 1)
       ORDER BY WEEK(order_date, 1) DESC
@@ -67,7 +67,7 @@ export async function getSalesReport(
         YEAR(order_date) AS bucket,
         COUNT(*) AS orders,
         COALESCE(SUM(total_amount), 0) AS gross_revenue
-      FROM \`ORDER\`
+      FROM orders
       WHERE order_date IS NOT NULL
       GROUP BY YEAR(order_date)
       ORDER BY YEAR(order_date) DESC
@@ -89,7 +89,7 @@ export async function getSalesReport(
       DATE_FORMAT(order_date, '%Y-%m') AS bucket,
       COUNT(*) AS orders,
       COALESCE(SUM(total_amount), 0) AS gross_revenue
-    FROM \`ORDER\`
+    FROM orders
     WHERE order_date IS NOT NULL
     GROUP BY DATE_FORMAT(order_date, '%Y-%m')
     ORDER BY DATE_FORMAT(order_date, '%Y-%m') DESC

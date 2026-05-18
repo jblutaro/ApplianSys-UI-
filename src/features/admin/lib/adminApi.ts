@@ -20,6 +20,7 @@ export type Order = {
   id: string;
   dbId: number;
   customer: string;
+  deliveryMethod: string;
   email: string;
   date: string;
   total: number;
@@ -31,6 +32,7 @@ export type AdminSettings = {
   supportEmail: string;
   description: string;
   currency: string;
+  deliveryRatePerKm: number;
   taxRate: number;
   maintenanceMode: boolean;
   orderNotifications: boolean;

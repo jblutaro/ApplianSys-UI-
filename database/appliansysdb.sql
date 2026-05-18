@@ -125,7 +125,7 @@ CREATE TABLE PAYMENT_DETAILS (
     payment_status    VARCHAR(50)
 );
 
-CREATE TABLE `ORDER` (
+CREATE TABLE orders (
     order_id          INT AUTO_INCREMENT PRIMARY KEY,
     user_id           INT NOT NULL,
     promo_id          INT,
@@ -142,39 +142,42 @@ CREATE TABLE `ORDER` (
         FOREIGN KEY (payment_id) REFERENCES PAYMENT_DETAILS(payment_id)
 );
 
-CREATE TABLE ORDER_ITEM (
+CREATE TABLE order_item (
     order_id         INT NOT NULL,
     product_id       INT NOT NULL,
     quantity         INT NOT NULL,
     price            DECIMAL(10,2) NOT NULL,
     PRIMARY KEY (order_id, product_id),
     CONSTRAINT fk_order_item_order
-        FOREIGN KEY (order_id) REFERENCES `ORDER`(order_id),
+        FOREIGN KEY (order_id) REFERENCES orders(order_id),
     CONSTRAINT fk_order_item_product
         FOREIGN KEY (product_id) REFERENCES PRODUCT(product_id)
 );
 
 CREATE TABLE DELIVERY (
     order_id           INT PRIMARY KEY,
-    user_id            INT NOT NULL,
+    user_id            INT,
     delivery_fee       DECIMAL(10,2),
     estimated_date     DATE,
     delivery_status    VARCHAR(50),
+    delivery_address   TEXT,
+    latitude           DECIMAL(10,7),
+    longitude          DECIMAL(10,7),
     CONSTRAINT fk_delivery_order
-        FOREIGN KEY (order_id) REFERENCES `ORDER`(order_id),
-    CONSTRAINT fk_delivery_staff
-        FOREIGN KEY (user_id) REFERENCES STAFF_USER(user_id)
+        FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    CONSTRAINT fk_delivery_customer_user
+        FOREIGN KEY (user_id) REFERENCES CUSTOMER_USER(user_id)
 );
 
 CREATE TABLE PICKUP (
     order_id          INT PRIMARY KEY,
-    user_id           INT NOT NULL,
+    user_id           INT,
     pickup_date       DATETIME,
     pickup_status     VARCHAR(50),
     CONSTRAINT fk_pickup_order
-        FOREIGN KEY (order_id) REFERENCES `ORDER`(order_id),
-    CONSTRAINT fk_pickup_staff
-        FOREIGN KEY (user_id) REFERENCES STAFF_USER(user_id)
+        FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    CONSTRAINT fk_pickup_customer_user
+        FOREIGN KEY (user_id) REFERENCES CUSTOMER_USER(user_id)
 );
 
 CREATE INDEX idx_subcategory_category
@@ -196,13 +199,13 @@ CREATE INDEX idx_cart_user
     ON CART(user_id);
 
 CREATE INDEX idx_order_user
-    ON `ORDER`(user_id);
+    ON orders(user_id);
 
 CREATE INDEX idx_order_promo
-    ON `ORDER`(promo_id);
+    ON orders(promo_id);
 
 CREATE INDEX idx_order_payment
-    ON `ORDER`(payment_id);
+    ON orders(payment_id);
 
 CREATE INDEX idx_delivery_user
     ON DELIVERY(user_id);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CategoryOption, Product } from "../lib/adminApi";
 import { formatCurrency, getStatusClass } from "../lib/adminUtils";
 
@@ -86,6 +86,14 @@ export function ProductsSection({
   const [productSearch, setProductSearch] = useState("");
   const [sortKey, setSortKey] = useState<ProductSortKey>("id");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [priceInput, setPriceInput] = useState<string>(draft.price === 0 ? "" : String(draft.price));
+  const [stockInput, setStockInput] = useState<string>(draft.stock === 0 ? "" : String(draft.stock));
+
+  // Sync local string inputs when the draft is swapped (edit / cancel)
+  useEffect(() => {
+    setPriceInput(draft.price === 0 ? "" : String(draft.price));
+    setStockInput(draft.stock === 0 ? "" : String(draft.stock));
+  }, [draft.id]);
   const selectedCategory = categories.find((category) => category.name === draft.category);
   const selectedSubcategory = selectedCategory?.subcategories.find(
     (subcategory) => subcategory.name === draft.subcategory,
@@ -485,8 +493,12 @@ export function ProductsSection({
               type="number"
               min="0"
               step="0.01"
-              value={draft.price}
-              onChange={(event) => setDraft({ ...draft, price: Number(event.target.value) })}
+              placeholder="0.00"
+              value={priceInput}
+              onChange={(event) => {
+                setPriceInput(event.target.value);
+                setDraft({ ...draft, price: event.target.value === "" ? 0 : Number(event.target.value) });
+              }}
             />
           </div>
           <div className="admin-field">
@@ -497,8 +509,12 @@ export function ProductsSection({
               type="number"
               min="0"
               step="1"
-              value={draft.stock}
-              onChange={(event) => setDraft({ ...draft, stock: Number(event.target.value) })}
+              placeholder="0"
+              value={stockInput}
+              onChange={(event) => {
+                setStockInput(event.target.value);
+                setDraft({ ...draft, stock: event.target.value === "" ? 0 : Number(event.target.value) });
+              }}
             />
           </div>
           <div className="admin-field--full">

@@ -21,6 +21,7 @@ function SearchPage() {
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [imageStep, setImageStep] = useState(0);
+  const [fadingStep, setFadingStep] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -50,7 +51,11 @@ function SearchPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setImageStep((current) => current + 1);
+      setFadingStep((current) => (current === null ? 0 : current + 1));
+      setTimeout(() => {
+        setImageStep((current) => current + 1);
+        setFadingStep(null);
+      }, 600);
     }, 2000);
 
     return () => window.clearInterval(timer);
@@ -81,29 +86,45 @@ function SearchPage() {
         <div className="category-tilebox">
           {categories.map((category) => {
             const images = getCategoryImages(category.name);
-            const activeImage = images.length > 0 ? images[imageStep % images.length] : "";
+            const currentImg = images.length > 0 ? images[imageStep % images.length] : "";
+            const nextImg =
+              images.length > 1 ? images[(imageStep + 1) % images.length] : currentImg;
+            const isFading = fadingStep !== null;
+
             return (
-            <button
-              key={category.id}
-              type="button"
-              className="category-tile"
-              onClick={() => {
-                void navigate(`/category/${slugify(category.name)}`);
-              }}
-            >
-              <span
-                className="category-tile__media"
-                style={activeImage ? { backgroundImage: `url(${activeImage})` } : undefined}
+              <button
+                key={category.id}
+                type="button"
+                className="category-tile"
+                onClick={() => {
+                  void navigate(`/category/${slugify(category.name)}`);
+                }}
               >
-                <span className="category-tile__media-label">{category.name}</span>
-              </span>
-              <span className="category-tile__body">
-                <span className="category-tile__label">{category.name}</span>
-                <span className="category-tile__meta">
-                  {category.subcategories.length} subcategor{category.subcategories.length === 1 ? "y" : "ies"}
+                <span className="category-tile__media">
+                  {currentImg ? (
+                    <img
+                      key={currentImg}
+                      src={currentImg}
+                      alt=""
+                      className={`category-tile__media-img${isFading ? " category-tile__media-img--out" : ""}`}
+                    />
+                  ) : null}
+                  {isFading && nextImg && nextImg !== currentImg ? (
+                    <img
+                      src={nextImg}
+                      alt=""
+                      className="category-tile__media-img category-tile__media-img--in"
+                    />
+                  ) : null}
+                  <span className="category-tile__media-label">{category.name}</span>
                 </span>
-              </span>
-            </button>
+                <span className="category-tile__body">
+                  <span className="category-tile__label">{category.name}</span>
+                  <span className="category-tile__meta">
+                    {category.subcategories.length} subcategor{category.subcategories.length === 1 ? "y" : "ies"}
+                  </span>
+                </span>
+              </button>
             );
           })}
         </div>

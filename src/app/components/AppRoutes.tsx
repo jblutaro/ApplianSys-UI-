@@ -4,6 +4,7 @@ import { AdminPage } from "@/features/admin";
 import { CartPage } from "@/features/cart";
 import { CategoryPage } from "@/features/category";
 import { OrdersPage } from "@/features/orders";
+import { ProductDetailPage } from "@/features/product";
 import { SearchPage } from "@/features/search";
 import { SettingsPage } from "@/features/settings";
 import type { AppUser } from "@/shared/lib/auth";
@@ -24,6 +25,7 @@ export function AppRoutes({ onAuthOpen, user }: AppRoutesProps) {
       <Route path="/admin" element={<AdminPage user={user} onAuthOpen={onAuthOpen} />} />
       <Route path="/category/:categorySlug" element={<CategoryPage />} />
       <Route path="/category/:categorySlug/:subSlug" element={<CategoryPage />} />
+      <Route path="/product/:productId" element={<ProductDetailPage />} />
     </Routes>
   );
 }

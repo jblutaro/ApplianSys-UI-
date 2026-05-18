@@ -1,0 +1,905 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import type { CartItem } from "@/shared/lib/cartApi";
+import {
+  fetchCheckoutSettings,
+  submitCheckout,
+  type FulfillmentDelivery,
+  type PlacedOrder,
+} from "@/shared/lib/checkoutApi";
+import "@/shared/styles/Checkout.css";
+import "leaflet/dist/leaflet.css";
+
+/* ── Leaflet icon fix (webpack/vite asset path issue) ── */
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+// @ts-expect-error — override default icon URLs
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+/* ── Types ── */
+type Method = "delivery" | "pickup";
+type Step = 1 | 2 | 3 | 4;
+type GcashStage = "login" | "otp" | "pay" | "receipt";
+
+type AddressForm = {
+  street: string;
+  barangay: string;
+  city: string;
+  province: string;
+};
+
+type ReverseGeocodeAddress = {
+  city?: string;
+  city_district?: string;
+  county?: string;
+  house_number?: string;
+  municipality?: string;
+  neighbourhood?: string;
+  province?: string;
+  region?: string;
+  road?: string;
+  state?: string;
+  state_district?: string;
+  suburb?: string;
+  town?: string;
+  village?: string;
+};
+
+type ReverseGeocodeResponse = {
+  address?: ReverseGeocodeAddress;
+};
+
+type Props = {
+  items: CartItem[];
+  onClose: () => void;
+  onSuccess: () => void;
+};
+
+/* ── Helpers ── */
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-PH", { currency: "PHP", style: "currency" }).format(value);
+}
+
+const PAYMENT_OPTIONS = [
+  { value: "Cash on Delivery", desc: "Pay when your order arrives" },
+  { value: "GCash",            desc: "Pay via GCash e-wallet" },
+  { value: "Bank Transfer",    desc: "Transfer to our bank account" },
+];
+
+const STORE_ADDRESS = "Old Albay District, Legazpi City, Albay";
+const OLD_ALBAY_SHOP_LOCATION = { lat: 13.1391, lng: 123.7438 };
+const ALBAY_CENTER = OLD_ALBAY_SHOP_LOCATION;
+const BASE_DELIVERY_FEE = 50;
+const DEFAULT_DELIVERY_RATE_PER_KM = 7.51;
+const ALBAY_DELIVERY_BOUNDS = {
+  north: 13.55,
+  south: 12.95,
+  east: 124.25,
+  west: 123.25,
+};
+
+function isWithinAlbayDeliveryArea(lat: number, lng: number) {
+  return (
+    lat >= ALBAY_DELIVERY_BOUNDS.south &&
+    lat <= ALBAY_DELIVERY_BOUNDS.north &&
+    lng >= ALBAY_DELIVERY_BOUNDS.west &&
+    lng <= ALBAY_DELIVERY_BOUNDS.east
+  );
+}
+
+function calculateDistanceKm(
+  first: { lat: number; lng: number },
+  second: { lat: number; lng: number },
+) {
+  const earthRadiusKm = 6371;
+  const latDelta = ((second.lat - first.lat) * Math.PI) / 180;
+  const lngDelta = ((second.lng - first.lng) * Math.PI) / 180;
+  const firstLat = (first.lat * Math.PI) / 180;
+  const secondLat = (second.lat * Math.PI) / 180;
+  const a =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.cos(firstLat) * Math.cos(secondLat) * Math.sin(lngDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function generateMockOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function generateGcashReceiptRef() {
+  return `GC${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+async function reverseGeocodeLocation(lat: number, lng: number): Promise<Partial<AddressForm>> {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) return {};
+
+  const data = (await response.json()) as ReverseGeocodeResponse;
+  const result = data.address;
+  if (!result) return {};
+
+  const province =
+    result.province ||
+    (result.county?.toLowerCase().includes("albay") ? result.county : "") ||
+    (result.state_district?.toLowerCase().includes("albay") ? result.state_district : "") ||
+    (result.state?.toLowerCase().includes("albay") ? result.state : "") ||
+    (isWithinAlbayDeliveryArea(lat, lng) ? "Albay" : result.state || result.region || "");
+
+  return {
+    street: [result.house_number, result.road].filter(Boolean).join(" "),
+    barangay: result.suburb || result.village || result.neighbourhood || result.city_district || "",
+    city: result.city || result.town || result.municipality || result.county || "",
+    province,
+  };
+}
+
+/* ── Map component (lazy-loaded to avoid SSR issues) ── */
+function DeliveryMap({
+  deliveryBounds,
+  lat,
+  lng,
+  onPick,
+}: {
+  deliveryBounds?: typeof ALBAY_DELIVERY_BOUNDS;
+  lat: number;
+  lng: number;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMap = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || leafletMap.current) return;
+
+    const map = L.map(mapRef.current).setView([lat, lng], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    if (deliveryBounds) {
+      L.rectangle(
+        [
+          [deliveryBounds.south, deliveryBounds.west],
+          [deliveryBounds.north, deliveryBounds.east],
+        ],
+        {
+          color: "#aa6d27",
+          fillColor: "#aa6d27",
+          fillOpacity: 0.08,
+          weight: 2,
+        },
+      ).addTo(map);
+    }
+
+    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    marker.bindPopup("Drag me to your exact location").openPopup();
+
+    marker.on("dragend", () => {
+      const pos = marker.getLatLng();
+      onPick(pos.lat, pos.lng);
+    });
+
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      marker.setLatLng(e.latlng);
+      onPick(e.latlng.lat, e.latlng.lng);
+    });
+
+    leafletMap.current = map;
+    markerRef.current = marker;
+
+    return () => {
+      map.remove();
+      leafletMap.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep marker in sync if parent updates lat/lng
+  useEffect(() => {
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    }
+  }, [lat, lng]);
+
+  return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
+}
+
+/* ══════════════════════════════
+   Main component
+   ══════════════════════════════ */
+export function CheckoutModal({ items, onClose, onSuccess }: Props) {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<Step>(1);
+  const [method, setMethod] = useState<Method>("delivery");
+  const [address, setAddress] = useState<AddressForm>({
+    street: "", barangay: "", city: "", province: "",
+  });
+  const [lat, setLat] = useState(ALBAY_CENTER.lat);
+  const [lng, setLng] = useState(ALBAY_CENTER.lng);
+  const [geoLocating, setGeoLocating] = useState(false);
+  const [addressLookupStatus, setAddressLookupStatus] = useState("");
+  const [deliveryRatePerKm, setDeliveryRatePerKm] = useState(DEFAULT_DELIVERY_RATE_PER_KM);
+  const [shopLocation, setShopLocation] = useState(OLD_ALBAY_SHOP_LOCATION);
+  const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [gcashStage, setGcashStage] = useState<GcashStage | null>(null);
+  const [gcashPhone, setGcashPhone] = useState("");
+  const [gcashOtp, setGcashOtp] = useState("");
+  const [gcashGeneratedOtp, setGcashGeneratedOtp] = useState("");
+  const [gcashReceiptRef, setGcashReceiptRef] = useState("");
+  const [gcashError, setGcashError] = useState("");
+
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const deliveryDistanceKm =
+    method === "delivery" ? calculateDistanceKm(shopLocation, { lat, lng }) : 0;
+  const shipping = method === "delivery" ? roundMoney(BASE_DELIVERY_FEE + deliveryDistanceKm * deliveryRatePerKm) : 0;
+  const total = subtotal + shipping;
+  const deliveryLocationInAlbay = isWithinAlbayDeliveryArea(lat, lng);
+  const lookupRequestId = useRef(0);
+  const isGcashGate = gcashStage !== null;
+  const normalizedGcashPhone = gcashPhone.replace(/\D/g, "");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const checkoutSettings = await fetchCheckoutSettings();
+        setDeliveryRatePerKm(checkoutSettings.deliveryRatePerKm);
+        setShopLocation(checkoutSettings.shopLocation);
+      } catch {
+        setDeliveryRatePerKm(DEFAULT_DELIVERY_RATE_PER_KM);
+        setShopLocation(OLD_ALBAY_SHOP_LOCATION);
+      }
+    })();
+  }, []);
+
+  /* ── Geolocation ── */
+  const updatePinnedLocation = (nextLat: number, nextLng: number) => {
+    setLat(nextLat);
+    setLng(nextLng);
+    setAddressLookupStatus("Finding address...");
+
+    const requestId = lookupRequestId.current + 1;
+    lookupRequestId.current = requestId;
+
+    void (async () => {
+      try {
+        const nextAddress = await reverseGeocodeLocation(nextLat, nextLng);
+        if (lookupRequestId.current !== requestId) return;
+
+        setAddress((current) => ({
+          street: nextAddress.street || current.street,
+          barangay: nextAddress.barangay || current.barangay,
+          city: nextAddress.city || current.city,
+          province: nextAddress.province || current.province,
+        }));
+        setAddressLookupStatus("Address updated from pinned location.");
+      } catch {
+        if (lookupRequestId.current === requestId) {
+          setAddressLookupStatus("Address lookup failed. Please enter the address manually.");
+        }
+      }
+    })();
+  };
+
+  const handleGeolocate = () => {
+    if (!navigator.geolocation) return;
+    setGeoLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updatePinnedLocation(pos.coords.latitude, pos.coords.longitude);
+        setGeoLocating(false);
+      },
+      () => setGeoLocating(false),
+    );
+  };
+
+  /* ── Step validation ── */
+  const canProceedStep2 =
+    method === "pickup" ||
+    (address.street.trim() !== "" &&
+      address.barangay.trim() !== "" &&
+      address.city.trim() !== "" &&
+      address.province.trim() !== "" &&
+      deliveryLocationInAlbay);
+
+  const buildFulfillment = () =>
+    method === "delivery"
+      ? ({
+          method: "delivery",
+          street: address.street,
+          barangay: address.barangay,
+          city: address.city,
+          province: address.province,
+          latitude: lat,
+          longitude: lng,
+        } satisfies FulfillmentDelivery)
+      : { method: "pickup" as const };
+
+  const startGcashLogin = () => {
+    setGcashError("");
+    setGcashStage("login");
+  };
+
+  const handleGcashLogin = () => {
+    if (!/^09\d{9}$/.test(normalizedGcashPhone)) {
+      setGcashError("Enter a valid 11-digit GCash mobile number starting with 09.");
+      return;
+    }
+
+    setGcashError("");
+    setGcashGeneratedOtp(generateMockOtp());
+    setGcashOtp("");
+    setGcashStage("otp");
+  };
+
+  const handleGcashOtp = () => {
+    if (gcashOtp.trim() !== gcashGeneratedOtp) {
+      setGcashError("Invalid mock OTP. Use the generated code shown on this screen.");
+      return;
+    }
+
+    setGcashError("");
+    setGcashStage("pay");
+  };
+
+  const handleGcashPayment = async () => {
+    if (method === "delivery" && !deliveryLocationInAlbay) {
+      setGcashError("ApplianSys can only deliver within Albay. Please select a location inside Albay or choose pickup.");
+      return;
+    }
+
+    setSubmitting(true);
+    setGcashError("");
+    try {
+      const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
+      setPlacedOrder(order);
+      setGcashReceiptRef(generateGcashReceiptRef());
+      onSuccess();
+      setGcashStage("receipt");
+    } catch (err) {
+      setGcashError(err instanceof Error ? err.message : "Failed to complete mock GCash payment.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ── Submit ── */
+  const handlePlaceOrder = async () => {
+    if (method === "delivery" && !deliveryLocationInAlbay) {
+      setSubmitError("ApplianSys can only deliver within Albay. Please select a location inside Albay or choose pickup.");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
+      setPlacedOrder(order);
+      onSuccess();
+      onClose();
+      void navigate("/orders");
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to place order.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ── Close on overlay click ── */
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && step !== 4) onClose();
+  };
+
+  /* ── Step labels ── */
+  const STEPS = [
+    { num: 1, label: "Method" },
+    { num: 2, label: "Details" },
+    { num: 3, label: "Review" },
+  ];
+
+  return (
+    <div className="checkout-overlay" onClick={handleOverlayClick} role="dialog" aria-modal aria-label="Checkout">
+      <div className="checkout-sheet">
+
+        {/* Header */}
+        <div className="checkout-sheet__header">
+          <h2 className="checkout-sheet__title">
+            {isGcashGate ? "Mock GCash Payment" : step === 4 ? "Order Placed!" : "Checkout"}
+          </h2>
+          {step !== 4 && (
+            <button type="button" className="checkout-sheet__close" onClick={onClose} aria-label="Close checkout">
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Step indicator */}
+        {step !== 4 && !isGcashGate && (
+          <div className="checkout-steps" aria-label="Checkout progress">
+            {STEPS.map((s, idx) => {
+              const isDone = step > s.num;
+              const isActive = step === s.num;
+              return (
+                <div key={s.num} style={{ display: "flex", alignItems: "center", flex: idx < STEPS.length - 1 ? 1 : "none" }}>
+                  <div className={`checkout-step${isActive ? " checkout-step--active" : ""}${isDone ? " checkout-step--done" : ""}`}>
+                    <div className="checkout-step__num">
+                      {isDone ? (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      ) : s.num}
+                    </div>
+                    <span>{s.label}</span>
+                  </div>
+                  {idx < STEPS.length - 1 && (
+                    <div className={`checkout-step__connector${isDone ? " checkout-step__connector--done" : ""}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="checkout-sheet__body">
+
+          {/* ── STEP 1: Method ── */}
+          {isGcashGate && (
+            <div className="gcash-gateway">
+              <div className="gcash-gateway__brand">
+                <span>GCash</span>
+                <small>Mock payment gateway</small>
+              </div>
+
+              {gcashStage === "login" ? (
+                <div className="gcash-card">
+                  <h3>Log in to your GCash account</h3>
+                  <p>This is a mock payment method for testing checkout only.</p>
+                  <label htmlFor="gcash-phone">Mobile number</label>
+                  <input
+                    id="gcash-phone"
+                    className="gcash-input"
+                    inputMode="numeric"
+                    maxLength={11}
+                    placeholder="09XXXXXXXXX"
+                    value={gcashPhone}
+                    onChange={(event) => setGcashPhone(event.target.value)}
+                  />
+                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
+                  <button type="button" className="gcash-btn" onClick={handleGcashLogin}>
+                    Continue
+                  </button>
+                </div>
+              ) : null}
+
+              {gcashStage === "otp" ? (
+                <div className="gcash-card">
+                  <h3>Enter OTP</h3>
+                  <p>Mock OTP sent to {normalizedGcashPhone}. Use code <strong>{gcashGeneratedOtp}</strong>.</p>
+                  <label htmlFor="gcash-otp">One-time PIN</label>
+                  <input
+                    id="gcash-otp"
+                    className="gcash-input gcash-input--otp"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={gcashOtp}
+                    onChange={(event) => setGcashOtp(event.target.value)}
+                  />
+                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
+                  <button type="button" className="gcash-btn" onClick={handleGcashOtp}>
+                    Verify OTP
+                  </button>
+                </div>
+              ) : null}
+
+              {gcashStage === "pay" ? (
+                <div className="gcash-card">
+                  <h3>Confirm Payment</h3>
+                  <div className="gcash-amount">{formatCurrency(total)}</div>
+                  <div className="gcash-summary">
+                    <span>Merchant</span>
+                    <strong>ApplianSys</strong>
+                    <span>Subtotal</span>
+                    <strong>{formatCurrency(subtotal)}</strong>
+                    <span>Shipping</span>
+                    <strong>{method === "delivery" ? formatCurrency(shipping) : "Free"}</strong>
+                  </div>
+                  {gcashError ? <p className="gcash-error">{gcashError}</p> : null}
+                  <button type="button" className="gcash-btn" onClick={() => void handleGcashPayment()} disabled={submitting}>
+                    {submitting ? "Processing..." : "Pay Now"}
+                  </button>
+                </div>
+              ) : null}
+
+              {gcashStage === "receipt" && placedOrder ? (
+                <div className="gcash-card gcash-card--receipt">
+                  <div className="gcash-receipt-check">✓</div>
+                  <h3>Payment Successful</h3>
+                  <p>Your mock GCash payment has been confirmed.</p>
+                  <div className="gcash-summary">
+                    <span>Receipt No.</span>
+                    <strong>{gcashReceiptRef}</strong>
+                    <span>Order Ref.</span>
+                    <strong>{placedOrder.orderRef}</strong>
+                    <span>Paid Amount</span>
+                    <strong>{formatCurrency(placedOrder.totalAmount)}</strong>
+                    <span>Mobile No.</span>
+                    <strong>{normalizedGcashPhone}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="gcash-btn"
+                    onClick={() => {
+                      onClose();
+                      void navigate("/orders");
+                    }}
+                  >
+                    View My Orders
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {!isGcashGate && step === 1 && (
+            <>
+              <p className="checkout-section-label">How would you like to receive your order?</p>
+              <div className="checkout-method-grid">
+                <button
+                  type="button"
+                  className={`checkout-method-card${method === "delivery" ? " checkout-method-card--selected" : ""}`}
+                  onClick={() => setMethod("delivery")}
+                >
+                  <div className="checkout-method-card__icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                      <rect x="1" y="3" width="15" height="13" rx="1" />
+                      <path d="M16 8h4l3 5v3h-7V8z" />
+                      <circle cx="5.5" cy="18.5" r="2.5" />
+                      <circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                  </div>
+                  <h3 className="checkout-method-card__title">Home Delivery</h3>
+                  <p className="checkout-method-card__desc">
+                    Delivered from Old Albay. Fee starts at {formatCurrency(BASE_DELIVERY_FEE)} plus {formatCurrency(deliveryRatePerKm)} per km.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  className={`checkout-method-card${method === "pickup" ? " checkout-method-card--selected" : ""}`}
+                  onClick={() => setMethod("pickup")}
+                >
+                  <div className="checkout-method-card__icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  </div>
+                  <h3 className="checkout-method-card__title">Store Pickup</h3>
+                  <p className="checkout-method-card__desc">
+                    Pick up from our store. Ready next business day. Free.
+                  </p>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 2: Details ── */}
+          {!isGcashGate && step === 2 && method === "delivery" && (
+            <>
+              <p className="checkout-section-label">Delivery Address</p>
+              <div className="checkout-form-grid">
+                <div className="checkout-field checkout-field--full">
+                  <label htmlFor="co-street">Street / House No.</label>
+                  <input
+                    id="co-street"
+                    className="checkout-input"
+                    placeholder="e.g. 123 Rizal St."
+                    value={address.street}
+                    onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                  />
+                </div>
+                <div className="checkout-field">
+                  <label htmlFor="co-barangay">Barangay</label>
+                  <input
+                    id="co-barangay"
+                    className="checkout-input"
+                    placeholder="e.g. Brgy. Poblacion"
+                    value={address.barangay}
+                    onChange={(e) => setAddress({ ...address, barangay: e.target.value })}
+                  />
+                </div>
+                <div className="checkout-field">
+                  <label htmlFor="co-city">City / Municipality</label>
+                  <input
+                    id="co-city"
+                    className="checkout-input"
+                    placeholder="e.g. Makati City"
+                    value={address.city}
+                    onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                  />
+                </div>
+                <div className="checkout-field checkout-field--full">
+                  <label htmlFor="co-province">Province / Region</label>
+                  <input
+                    id="co-province"
+                    className="checkout-input"
+                    placeholder="e.g. Metro Manila"
+                    value={address.province}
+                    onChange={(e) => setAddress({ ...address, province: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Map pin */}
+              <div className="checkout-map-label">
+                Pin your location
+                <span>optional — drag the marker or click the map</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className="checkout-btn-back"
+                  style={{ padding: "8px 14px", fontSize: 13 }}
+                  onClick={handleGeolocate}
+                  disabled={geoLocating}
+                >
+                  {geoLocating ? "Locating…" : "📍 Use my location"}
+                </button>
+              </div>
+              <div className="checkout-map-wrap">
+                <DeliveryMap
+                  deliveryBounds={ALBAY_DELIVERY_BOUNDS}
+                  lat={lat}
+                  lng={lng}
+                  onPick={updatePinnedLocation}
+                />
+              </div>
+              <p className="checkout-map-hint">
+                Coordinates: {lat.toFixed(5)}, {lng.toFixed(5)}
+              </p>
+              {addressLookupStatus ? (
+                <p className="checkout-map-hint">{addressLookupStatus}</p>
+              ) : null}
+              {!deliveryLocationInAlbay ? (
+                <p className="checkout-map-warning">
+                  ApplianSys can only deliver within Albay. Move the pin inside the highlighted area or choose pickup.
+                </p>
+              ) : null}
+            </>
+          )}
+
+          {!isGcashGate && step === 2 && method === "pickup" && (
+            <>
+              <p className="checkout-section-label">Pickup Location</p>
+              <div className="checkout-pickup-info">
+                <div className="checkout-pickup-info__icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="checkout-pickup-info__title">ApplianSys Main Store</p>
+                  <p className="checkout-pickup-info__address">{STORE_ADDRESS}</p>
+                  <p className="checkout-pickup-info__hours">Mon–Sat · 8:00 AM – 6:00 PM</p>
+                </div>
+              </div>
+              <div className="checkout-map-wrap">
+                <DeliveryMap lat={14.5547} lng={121.0244} onPick={() => {}} />
+              </div>
+            </>
+          )}
+
+          {/* Payment method — shown on step 2 */}
+          {!isGcashGate && step === 2 && (
+            <>
+              <p className="checkout-section-label" style={{ marginTop: 24 }}>Payment Method</p>
+              <div className="checkout-payment-options">
+                {PAYMENT_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`checkout-payment-option${paymentMethod === opt.value ? " checkout-payment-option--selected" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={opt.value}
+                      checked={paymentMethod === opt.value}
+                      onChange={() => setPaymentMethod(opt.value)}
+                    />
+                    <span className="checkout-payment-option__label">{opt.value}</span>
+                    <span className="checkout-payment-option__desc">{opt.desc}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 3: Review ── */}
+          {!isGcashGate && step === 3 && (
+            <>
+              <p className="checkout-section-label">Order Items</p>
+              <div className="checkout-review-items">
+                {items.map((item) => (
+                  <div key={item.productId} className="checkout-review-item">
+                    <div className="checkout-review-item__img">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.productName} />
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.2" aria-hidden>
+                          <rect x="3" y="3" width="18" height="18" rx="3" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="checkout-review-item__name">
+                      {item.productName}
+                      <div className="checkout-review-item__qty">Qty: {item.quantity}</div>
+                    </div>
+                    <span className="checkout-review-item__price">
+                      {formatCurrency(item.price * item.quantity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="checkout-review-totals">
+                <div className="checkout-review-row">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="checkout-review-row">
+                  <span>Shipping</span>
+                  <span>
+                    {method === "delivery"
+                      ? `${formatCurrency(shipping)} (${deliveryDistanceKm.toFixed(2)} km)`
+                      : "Free"}
+                  </span>
+                </div>
+                <div className="checkout-review-row checkout-review-row--total">
+                  <span>Total</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
+              </div>
+
+              <div className="checkout-review-address">
+                <p className="checkout-review-address__label">
+                  {method === "delivery" ? "Delivery Address" : "Pickup Location"}
+                </p>
+                <p className="checkout-review-address__value">
+                  {method === "delivery"
+                    ? [address.street, address.barangay, address.city, address.province]
+                        .filter(Boolean)
+                        .join(", ")
+                    : STORE_ADDRESS}
+                </p>
+              </div>
+
+              <div className="checkout-review-address">
+                <p className="checkout-review-address__label">Payment</p>
+                <p className="checkout-review-address__value">{paymentMethod}</p>
+              </div>
+
+              {submitError && (
+                <p style={{ color: "#b42318", fontSize: 14, margin: "12px 0 0", fontWeight: 600 }}>
+                  {submitError}
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ── STEP 4: Success ── */}
+          {!isGcashGate && step === 4 && placedOrder && (
+            <div className="checkout-success">
+              <div className="checkout-success__icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+              <h3 className="checkout-success__title">Order Confirmed!</h3>
+              <p className="checkout-success__ref">
+                Reference: <strong>{placedOrder.orderRef}</strong>
+              </p>
+              <p className="checkout-success__detail">
+                {placedOrder.deliveryMethod === "delivery"
+                  ? "Your order is being processed and will be delivered in 3–5 business days."
+                  : "Your order is ready for pickup at our store next business day."}
+                {" "}Payment method: <strong>{paymentMethod}</strong>.
+              </p>
+              <div className="checkout-success__actions">
+                <Link to="/orders" className="checkout-success__btn-primary" onClick={onClose}>
+                  View My Orders
+                </Link>
+                <Link to="/" className="checkout-success__btn-secondary" onClick={onClose}>
+                  Continue Shopping
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {step !== 4 && !isGcashGate && (
+          <div className="checkout-sheet__footer">
+            {step > 1 && (
+              <button
+                type="button"
+                className="checkout-btn-back"
+                onClick={() => setStep((s) => (s - 1) as Step)}
+                disabled={submitting}
+              >
+                Back
+              </button>
+            )}
+
+            {step < 3 && (
+              <button
+                type="button"
+                className="checkout-btn-next"
+                disabled={step === 2 && !canProceedStep2}
+                onClick={() => {
+                  if (step === 2 && paymentMethod === "GCash") {
+                    startGcashLogin();
+                    return;
+                  }
+
+                  setStep((s) => (s + 1) as Step);
+                }}
+              >
+                Continue
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
+            {step === 3 && (
+              <button
+                type="button"
+                className="checkout-btn-next"
+                disabled={submitting}
+                onClick={() => void handlePlaceOrder()}
+              >
+                {submitting ? (
+                  <><div className="checkout-spinner" /> Placing Order…</>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    Place Order · {formatCurrency(total)}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

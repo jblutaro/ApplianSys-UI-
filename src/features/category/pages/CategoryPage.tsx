@@ -128,9 +128,30 @@ function CategoryPage() {
 
       <div className="cat-layout">
         <aside className="cat-sidebar">
-          <Link to="/" className="cat-sidebar__show-all">
-            Show all Categories <span>&gt;</span>
-          </Link>
+          {categories.length > 0 ? (
+            <details className="cat-sidebar__cat-dropdown">
+              <summary className="cat-sidebar__cat-summary">
+                All Categories
+                <span className="cat-sidebar__cat-chevron" aria-hidden="true">&#8964;</span>
+              </summary>
+              <ul className="cat-sidebar__list cat-sidebar__list--categories">
+                {categories.map((cat) => {
+                  const catSlug = slugify(cat.name);
+                  const isActive = catSlug === categorySlug;
+                  return (
+                    <li key={cat.id}>
+                      <Link
+                        to={`/category/${catSlug}`}
+                        className={`cat-sidebar__item cat-sidebar__item--category${isActive ? " cat-sidebar__item--category-active" : ""}`}
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          ) : null}
 
           {category?.subcategories.length ? (
             <>
@@ -204,7 +225,12 @@ function CategoryPage() {
           {!isLoading && !errorMessage && visibleProducts.length > 0 ? (
             <div className="cat-grid">
               {visibleProducts.map((product) => (
-                <article key={product.id} className="cat-product-card">
+                <Link
+                  key={product.id}
+                  to={`/product/${product.id}`}
+                  className="cat-product-card"
+                  style={{ textDecoration: "none" }}
+                >
                   <div className="cat-product-card__img">
                     {product.image ? (
                       <img src={product.image} alt={product.name} />
@@ -224,7 +250,7 @@ function CategoryPage() {
                     </p>
                     <strong className="cat-product-card__price">{formatCurrency(product.price)}</strong>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           ) : null}

@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => {
       host: true,
       allowedHosts: true,
     },
+    optimizeDeps: {
+      include: ["leaflet"],
+    },
     resolve: {
       alias: {
         "@": normalizedSrcPath,

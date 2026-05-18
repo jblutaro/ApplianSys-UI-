@@ -1,114 +1,76 @@
 # ApplianSys
 
-ApplianSys is a React + Vite storefront with a separate Express + MySQL backend for admin data and reports.
+ApplianSys is a full-stack appliance e-commerce storefront. The frontend is a React + Vite SPA; the backend is an Express + TypeScript API backed by MySQL.
 
 ## Stack
 
-- Frontend: React, TypeScript, Vite, React Router, MUI
-- State: Redux Toolkit, React Redux
-- Backend: Express, TypeScript, mysql2
-- Auth/UI integrations: Local backend auth
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 7 (SWC) |
+| Routing | React Router v7 |
+| UI library | MUI v7 + Emotion |
+| Styling | Custom CSS (CSS variables), Tailwind v4 (installed) |
+| State | Redux Toolkit + React Redux |
+| Backend | Express 4, TypeScript, tsx |
+| Database | MySQL via mysql2 |
+| Auth | Session-cookie auth (in-memory, server-side) |
+| Chat | OpenAI chat completions via backend proxy |
 
 ## Project Layout
 
-- `src/` frontend application code
-- `backend/` Express API and MySQL access
-- `database/` SQL schema / seed assets
-- `public/` static assets served by Vite
-- `.env.example` root environment template for the frontend
-- `backend/.env.example` backend environment template for the API
-
-### Frontend Structure
-
-The frontend is organized by layer:
-
-- `src/app/`
-  App shell, route composition, top-level hooks, providers, and store setup
-- `src/features/`
-  Route features such as admin, about, cart, category, orders, and search
-- `src/shared/`
-  Cross-feature components, hooks, request helpers, chat/auth clients, assets, and styles
-
-Current shell/auth/chat split:
-
-- `src/app/App.tsx`
-  Top-level composition only
-- `src/app/components/AppHeader.tsx`
-  Header composition
-- `src/app/components/header/*`
-  Header navigation, user menu, and avatar subcomponents
-- `src/app/components/AppRoutes.tsx`
-  Route mapping
-- `src/app/hooks/useAuthUser.ts`
-  App-wide auth subscription hook
-- `src/shared/components/AuthModal.tsx`
-  Auth modal coordinator
-- `src/shared/components/auth/*`
-  Auth account and credentials panels
-- `src/shared/lib/http.ts`
-  Shared JSON request helper
-- `src/shared/lib/auth.ts`
-  Frontend auth client and auth state emitter
-- `src/shared/lib/chat.ts`
-  Chat API client and message types
-- `src/shared/hooks/useChatbot.ts`
-  Chatbot state/orchestration hook
-
-The admin feature remains split by responsibility:
-
-- `src/features/admin/pages/`
-  Route-level composition
-- `src/features/admin/components/`
-  Section UI such as dashboard, products, orders, platform settings, account settings, and access states
-- `src/features/admin/hooks/`
-  Admin data orchestration and mutations
-- `src/features/admin/lib/`
-  API access, constants, access checks, and formatting helpers
-- `src/features/settings/`
-  Customer-only signed-user settings page and preference persistence
+```
+ApplianSys/
+├── src/                    Frontend application
+│   ├── app/                Shell, routes, providers, store
+│   ├── features/           Route-level features
+│   │   ├── about/
+│   │   ├── admin/
+│   │   ├── cart/
+│   │   ├── category/
+│   │   ├── orders/
+│   │   ├── product/        Product detail page
+│   │   ├── search/         Home / category browse
+│   │   └── settings/
+│   ├── shared/             Cross-feature components, hooks, lib, styles
+│   └── theme/              MUI theme
+├── backend/                Express API
+│   └── src/
+│       ├── auth/           Session, password, user helpers, middleware
+│       ├── config/         env.ts, database.ts
+│       ├── data/           admin-settings.json (file-backed settings)
+│       ├── routes/         Express routers
+│       ├── scripts/        One-off migration and seed scripts
+│       └── services/       Business logic (admin/, auth/, cart/, chat/)
+├── database/               SQL schema (appliansysdb.sql)
+├── public/                 Static assets served by Vite
+├── .env.example            Root env template (frontend + Vite proxy)
+└── backend/.env.example    Backend env template (DB, OpenAI, port)
+```
 
 ## Environment Files
 
-This project uses two separate environment files:
+Two separate `.env` files are required.
 
-1. Root `.env`
-   Used by Vite and the frontend application.
-
-2. `backend/.env`
-   Used by the Express backend and database connection.
-
-Do not commit real credentials, tokens, or production values into either file.
-
-### Root `.env`
-
-Create it from the template:
+### Root `.env` (frontend / Vite)
 
 ```bash
 copy .env.example .env
 ```
-
-Expected keys:
 
 ```env
 VITE_ADMIN_EMAILS=admin@example.com
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000
 ```
 
-Notes:
+- `VITE_ADMIN_EMAILS` — comma-separated list of emails granted admin access.
+- `VITE_API_PROXY_TARGET` — backend URL that Vite proxies `/api` requests to in dev.
+- Restart Vite after editing.
 
-- `VITE_ADMIN_EMAILS` is a comma-separated list of emails allowed into the admin UI.
-- `VITE_API_PROXY_TARGET` is the backend URL Vite proxies `/api` requests to during development.
-- Restart the frontend dev server after changing the root `.env`.
-
-### Backend `.env`
-
-Create it from the template:
+### `backend/.env` (server / database)
 
 ```bash
 copy backend\.env.example backend\.env
 ```
-
-Expected keys:
 
 ```env
 PORT=4000
@@ -121,111 +83,130 @@ OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-Notes:
-
-- These values are local-development placeholders only.
-- Use your own MySQL username and password.
-- `OPENAI_API_KEY` is used by the backend chatbot route.
-- `OPENAI_MODEL` is optional and defaults to `gpt-4o-mini`.
-- Do not paste real secrets into the documentation or source-controlled examples.
+- Never commit real credentials. Keep `backend/.env` local only.
 
 ## Setup
 
-Install frontend dependencies:
-
 ```bash
+# 1. Install frontend dependencies
 npm install
-```
 
-Install backend dependencies:
-
-```bash
+# 2. Install backend dependencies
 npm run install:backend
-```
 
-Create the environment files:
-
-```bash
+# 3. Create env files
 copy .env.example .env
 copy backend\.env.example backend\.env
+
+# 4. Import the database schema
+#    Open MySQL and run: database/appliansysdb.sql
 ```
 
-Import or create the local MySQL database using the SQL in `database/`.
-
-## Running the App
-
-Start frontend and backend together:
+## Running
 
 ```bash
+# Both services together
 npm run dev
-```
 
-Start only the frontend:
-
-```bash
+# Frontend only
 npm run start
-```
 
-Start only the backend:
-
-```bash
+# Backend only
 npm run start:backend
 ```
 
 ## Scripts
 
-- `npm run dev` starts both dev servers
-- `npm run start` starts Vite only
-- `npm run start:backend` starts the backend only
-- `npm run install:backend` installs backend dependencies
-- `npm run lint` runs ESLint
-- `npm run format` runs Prettier
-- `npm run build` builds the frontend
-- `npm run preview` previews the frontend build
-- `npm --prefix backend run hash:password -- <password>` generates a backend password hash
-- `npm --prefix backend run migrate:passwords` migrates plain-text `USER.password` rows to hashed storage
-- `npm --prefix backend run migrate:account-ids` backfills ULID-based public account IDs into `USER.account_id`
+| Command | Description |
+|---|---|
+| `npm run dev` | Start frontend + backend together |
+| `npm run start` | Start Vite dev server only |
+| `npm run start:backend` | Start Express backend only |
+| `npm run install:backend` | Install backend npm dependencies |
+| `npm run build` | TypeScript check + Vite production build |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Run Prettier |
+| `npm run preview` | Preview the production build |
+| `npm --prefix backend run hash:password -- <pw>` | Hash a password with scrypt |
+| `npm --prefix backend run migrate:passwords` | Upgrade plain-text passwords to hashed |
+| `npm --prefix backend run migrate:account-ids` | Backfill ULID account IDs |
 
-## Backend Notes
+## API Endpoints
 
-- The admin dashboard depends on the backend API.
-- Email/password authentication is handled by backend routes under `/api/auth`.
-- Backend auth flow is split between:
-  - `backend/src/routes/auth.ts`
-  - `backend/src/services/auth/*`
-  - `backend/src/auth/*`
-- The storefront chatbot now calls backend route `/api/chat`.
-- Backend chat flow is split between:
-  - `backend/src/routes/chat.ts`
-  - `backend/src/services/chat/*`
-- The OpenAI key must stay in `backend/.env`.
-- Users now have a public ULID-based `account_id` in the database while numeric `user_id` remains the internal primary key.
-- Auth now exposes account profile/password endpoints under `/api/auth/account` and `/api/auth/password`.
-- Admin backend flow is split between:
-  - `backend/src/routes/admin*.ts`
-  - `backend/src/services/admin/*`
-- Seeded local users default to password `ApplianSys123!`.
-- Admin accounts are constrained to admin work only:
-  - no cart
-  - no customer order page
-  - no customer settings page
-- Admin panel navigation now separates:
-  - `Platform` for storefront-wide settings
-  - `Settings` for the signed-in admin's own account and password management
-- In dev mode, frontend `/api/...` requests are proxied through Vite to `VITE_API_PROXY_TARGET`.
-- If the backend is down, admin requests will fail with proxy errors such as `ECONNREFUSED 127.0.0.1:4000`.
-- If the backend is up but database credentials are wrong, admin endpoints can return `500`.
+### Public
 
-## Common Local Checks
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Service health check |
+| GET | `/api/db-test` | Database connectivity check |
+| GET | `/api/products` | List all products (catalog) |
+| GET | `/api/categories` | List all categories with subcategories |
+| POST | `/api/chat` | Chatbot — proxies to OpenAI |
 
-- Frontend health: open the Vite URL shown in the terminal
-- Backend health: `GET http://127.0.0.1:4000/api/health`
-- Database test: `GET http://127.0.0.1:4000/api/db-test`
+### Auth (`/api/auth`)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/auth/me` | Current session user |
+| POST | `/api/auth/login` | Sign in |
+| POST | `/api/auth/register` | Register new customer account |
+| POST | `/api/auth/logout` | Sign out |
+| GET | `/api/auth/account` | Get account profile |
+| PUT | `/api/auth/account` | Update account profile |
+| PUT | `/api/auth/password` | Change password |
+
+### Cart (`/api/cart`) — requires customer session
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/cart` | Get current user's cart items |
+| POST | `/api/cart/items` | Add item (or increase quantity) |
+| PATCH | `/api/cart/items/:productId` | Set exact quantity (0 = remove) |
+| DELETE | `/api/cart/items/:productId` | Remove item |
+
+### Admin (`/api/admin`) — requires admin or staff session
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/dashboard` | Dashboard metrics, products, orders, revenue |
+| GET | `/api/admin/products` | Product list |
+| POST | `/api/admin/products` | Create product |
+| PUT | `/api/admin/products/:id` | Update product |
+| DELETE | `/api/admin/products/:id` | Delete product |
+| GET | `/api/admin/categories` | Category tree |
+| POST | `/api/admin/categories` | Create category + subcategory |
+| POST | `/api/admin/subcategories/:id/sub-subcategories` | Add sub-subcategory |
+| DELETE | `/api/admin/subcategories/:id` | Delete subcategory |
+| DELETE | `/api/admin/sub-subcategories/:id` | Delete sub-subcategory |
+| GET | `/api/admin/orders` | Order list |
+| PATCH | `/api/admin/orders/:id/status` | Update order status |
+| GET | `/api/admin/settings` | Platform settings |
+| PUT | `/api/admin/settings` | Update platform settings |
+| GET | `/api/admin/reports/sales` | Sales report |
+
+## Auth and Roles
+
+- Authentication uses an in-memory session cookie (`appliansys_session`, 7-day TTL).
+- Passwords are hashed with Node's built-in `scrypt`.
+- Three roles: `customer`, `staff`, `admin`.
+- Admin access is granted by `user_type = 'admin'` in the DB, or by matching `VITE_ADMIN_EMAILS`, or by an `admin*` email prefix.
+- Admin and staff accounts cannot use the cart, orders, or customer settings pages.
+- Default seeded password: `ApplianSys123!`
+
+## Common Checks
+
+```
+Frontend:   http://localhost:5173  (or the port Vite prints)
+Backend:    http://127.0.0.1:4000/api/health
+DB test:    http://127.0.0.1:4000/api/db-test
+```
+
+If the backend is unreachable, admin and cart requests fail with `ECONNREFUSED 127.0.0.1:4000`.
 
 ## Security
 
-- Keep `.env` and `backend/.env` local only.
-- Never commit API keys, database passwords, or production endpoints.
-- Use placeholder values in docs, examples, screenshots, and pull requests.
+- Keep `.env` and `backend/.env` local. Never commit real credentials.
+- Use placeholder values in docs, examples, and pull requests.
+- `OPENAI_API_KEY` must stay in `backend/.env` only.
 
-See `DOCUMENTATION.md` for a fuller architecture and workflow summary.
+See `DOCUMENTATION.md` for full architecture details.

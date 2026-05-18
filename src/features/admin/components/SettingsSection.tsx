@@ -77,6 +77,19 @@ export function SettingsSection({
               onChange={(event) => setSettings({ ...settings, taxRate: Number(event.target.value) })}
             />
           </div>
+
+          <div className="admin-field">
+            <label htmlFor="delivery-rate">Delivery Rate (₱ / km)</label>
+            <input
+              id="delivery-rate"
+              className="admin-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={settings.deliveryRatePerKm}
+              onChange={(event) => setSettings({ ...settings, deliveryRatePerKm: Number(event.target.value) })}
+            />
+          </div>
         </div>
 
         <button type="button" className="admin-primary-btn" onClick={onSave} disabled={isSaving}>

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAdminUser } from "@/features/admin";
 import type { AppUser } from "@/shared/lib/auth";
+import { fetchOrders, type CustomerOrder } from "@/shared/lib/ordersApi";
 import "@/shared/styles/Orders.css";
 
 type Tab = "all" | "pending" | "shipped" | "delivered";
@@ -16,17 +17,10 @@ const TABS: { key: Tab; label: string }[] = [
 // Status badge color
 const STATUS_COLOR: Record<string, string> = {
   Pending: "#e67e22",
+  Processing: "#8c6500",
   Shipped: "#2980b9",
   Delivered: "#27ae60",
 };
-
-// Placeholder orders — empty for now, structure is ready
-const ORDERS: {
-  id: string;
-  date: string;
-  status: "Pending" | "Shipped" | "Delivered";
-  items: { name: string; qty: number; price: number }[];
-}[] = [];
 
 type OrdersPageProps = {
   onAuthOpen: () => void;
@@ -36,6 +30,26 @@ type OrdersPageProps = {
 function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!user || isAdminUser(user)) return;
+
+    void Promise.resolve().then(async () => {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        setOrders(await fetchOrders());
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load orders.");
+      } finally {
+        setIsLoading(false);
+      }
+    });
+  }, [user]);
 
   if (!user) {
     return (
@@ -73,7 +87,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
     );
   }
 
-  const filtered = ORDERS.filter((o) => {
+  const filtered = orders.filter((o) => {
     const matchTab =
       activeTab === "all" || o.status.toLowerCase() === activeTab;
     const matchSearch =
@@ -115,7 +129,15 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="orders-empty">
+          <p className="orders-empty__text">Loading orders...</p>
+        </div>
+      ) : errorMessage ? (
+        <div className="orders-empty">
+          <p className="orders-empty__text">{errorMessage}</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="orders-empty">
           <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" aria-hidden>
             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
@@ -126,9 +148,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
         </div>
       ) : (
         <div className="orders-list">
-          {filtered.map((order) => {
-            const total = order.items.reduce((s, i) => s + i.price * i.qty, 0);
-            return (
+          {filtered.map((order) => (
               <div key={order.id} className="order-card">
                 <div className="order-card__header">
                   <span className="order-card__id">Order #{order.id}</span>
@@ -136,15 +156,20 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                   <span className="order-card__status" style={{ color: STATUS_COLOR[order.status] }}>
                     Status: <strong>{order.status}</strong>
                   </span>
+                  <span className="order-card__date">
+                    {order.deliveryMethod === "pickup" ? "Store pickup" : "Home delivery"}
+                  </span>
                 </div>
 
                 <div className="order-card__items">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="order-item">
-                      <div className="order-item__img-placeholder" />
+                  {order.items.map((item) => (
+                    <div key={`${order.id}-${item.productId}`} className="order-item">
+                      <div className="order-item__img-placeholder">
+                        {item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}
+                      </div>
                       <div className="order-item__info">
                         <span className="order-item__name">{item.name}</span>
-                        <span className="order-item__qty">Qty: {item.qty}</span>
+                        <span className="order-item__qty">Qty: {item.quantity}</span>
                       </div>
                       <span className="order-item__price">
                         ₱{item.price.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
@@ -157,7 +182,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                   <span className="order-card__total">
                     Order Total:{" "}
                     <strong className="order-card__total-amount">
-                      ₱{total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
+                      ₱{order.total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
                     </strong>
                   </span>
                   <div className="order-card__actions">
@@ -170,8 +195,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                   </div>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>

@@ -224,7 +224,7 @@ async function seedUsersAndOrders() {
 
   for (const order of orders) {
     await dbPool.query(
-      "INSERT INTO `ORDER` (user_id, promo_id, payment_id, order_date, total_amount, order_status, delivery_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO orders (user_id, promo_id, payment_id, order_date, total_amount, order_status, delivery_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
       order,
     );
   }
@@ -232,7 +232,7 @@ async function seedUsersAndOrders() {
 
 async function main() {
   const productCount = await scalarCount("PRODUCT");
-  const orderCount = await scalarCount("ORDER");
+  const orderCount = await scalarCount("orders");
 
   if (productCount > 0 || orderCount > 0) {
     console.log("Seed skipped: database already contains products or orders.");

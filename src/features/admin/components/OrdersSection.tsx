@@ -22,6 +22,7 @@ export function OrdersSection({ onChangeStatus, orders }: OrdersSectionProps) {
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
+              <th>Method</th>
               <th>Date</th>
               <th>Total</th>
               <th>Status</th>
@@ -38,6 +39,7 @@ export function OrdersSection({ onChangeStatus, orders }: OrdersSectionProps) {
                     <small>{order.email}</small>
                   </div>
                 </td>
+                <td>{order.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</td>
                 <td>{order.date}</td>
                 <td>{formatCurrency(order.total)}</td>
                 <td>

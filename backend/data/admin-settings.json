@@ -3,6 +3,7 @@
   "supportEmail": "support@appliansys.com",
   "description": "Premium appliances for every household.",
   "currency": "PHP (PHP)",
+  "deliveryRatePerKm": 7.51,
   "taxRate": 8.5,
   "maintenanceMode": false,
   "orderNotifications": true,

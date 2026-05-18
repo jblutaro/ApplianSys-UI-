@@ -9,9 +9,10 @@ export async function getOrders(): Promise<AdminOrder[]> {
       o.order_date,
       o.total_amount,
       o.order_status,
+      o.delivery_method,
       u.email,
       CONCAT(u.fname, ' ', u.lname) AS customer_name
-    FROM \`ORDER\` o
+    FROM orders o
     INNER JOIN \`USER\` u ON u.user_id = o.user_id
     ORDER BY o.order_date DESC, o.order_id DESC
   `);
@@ -20,6 +21,7 @@ export async function getOrders(): Promise<AdminOrder[]> {
     id: `ORD-${String(row.order_id).padStart(4, "0")}`,
     dbId: Number(row.order_id),
     customer: String(row.customer_name || "Customer"),
+    deliveryMethod: String(row.delivery_method || "delivery"),
     email: String(row.email || ""),
     date: row.order_date ? new Date(row.order_date).toISOString().slice(0, 10) : "",
     total: Number(row.total_amount),
@@ -28,7 +30,7 @@ export async function getOrders(): Promise<AdminOrder[]> {
 }
 
 export async function updateOrderStatus(orderId: number, status: string) {
-  await dbPool.query("UPDATE `ORDER` SET order_status = ? WHERE order_id = ?", [
+  await dbPool.query("UPDATE orders SET order_status = ? WHERE order_id = ?", [
     status,
     orderId,
   ]);

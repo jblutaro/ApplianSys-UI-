@@ -536,7 +536,7 @@ export async function deleteProduct(productId: number) {
     }
 
     const [orderItemRows] = await connection.query<RowDataPacket[]>(
-      "SELECT COUNT(*) AS count FROM ORDER_ITEM WHERE product_id = ?",
+      "SELECT COUNT(*) AS count FROM order_item WHERE product_id = ?",
       [productId],
     );
 

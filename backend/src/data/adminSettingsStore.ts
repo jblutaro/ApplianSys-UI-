@@ -6,6 +6,7 @@ export type AdminSettings = {
   supportEmail: string;
   description: string;
   currency: string;
+  deliveryRatePerKm: number;
   taxRate: number;
   maintenanceMode: boolean;
   orderNotifications: boolean;
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
   supportEmail: "support@appliansys.com",
   description: "Premium appliances for every household.",
   currency: "PHP (PHP)",
+  deliveryRatePerKm: 7.51,
   taxRate: 8.5,
   maintenanceMode: false,
   orderNotifications: true,
@@ -39,11 +41,18 @@ async function ensureSettingsFile() {
 export async function readAdminSettings() {
   await ensureSettingsFile();
   const file = await readFile(settingsPath, "utf8");
-  return JSON.parse(file) as AdminSettings;
+  return { ...DEFAULT_SETTINGS, ...(JSON.parse(file) as Partial<AdminSettings>) };
 }
 
 export async function writeAdminSettings(settings: AdminSettings) {
   await ensureSettingsFile();
-  await writeFile(settingsPath, JSON.stringify(settings, null, 2), "utf8");
-  return settings;
+  const nextSettings = {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    deliveryRatePerKm: Number.isFinite(Number(settings.deliveryRatePerKm))
+      ? Math.max(0, Number(settings.deliveryRatePerKm))
+      : DEFAULT_SETTINGS.deliveryRatePerKm,
+  };
+  await writeFile(settingsPath, JSON.stringify(nextSettings, null, 2), "utf8");
+  return nextSettings;
 }
