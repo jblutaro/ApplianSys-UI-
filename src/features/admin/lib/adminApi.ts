@@ -7,6 +7,10 @@ export type Product = {
   dbId: number;
   name: string;
   category: string;
+  subcategory: string;
+  subSubcategory: string;
+  description: string;
+  image: string;
   price: number;
   stock: number;
   status: ProductStatus;
@@ -33,6 +37,19 @@ export type AdminSettings = {
   emailCampaigns: boolean;
 };
 
+export type CategoryOption = {
+  id: number;
+  name: string;
+  subcategories: {
+    id: number;
+    name: string;
+    subSubcategories: {
+      id: number;
+      name: string;
+    }[];
+  }[];
+};
+
 export type AdminAccountProfile = {
   accountId: string;
   contactNumber: string;
@@ -43,7 +60,7 @@ export type AdminAccountProfile = {
   lastLogin: string | null;
   lastName: string;
   middleName: string;
-  role: "admin" | "customer";
+  role: "admin" | "staff" | "customer";
   status: string;
 };
 
@@ -105,11 +122,78 @@ export async function fetchSalesReport(period: ReportPeriod) {
 export async function createProduct(payload: {
   name: string;
   category: string;
+  subcategory: string;
+  subSubcategory: string;
+  description: string;
+  image: string;
   price: number;
   stock: number;
 }) {
   return request<{ ok: true; products: Product[] }>("/api/admin/products", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchAdminCategories() {
+  return request<{ ok: true; categories: CategoryOption[] }>("/api/admin/categories");
+}
+
+export async function createCategory(payload: {
+  categoryName: string;
+  subcategoryName: string;
+}) {
+  return request<{ ok: true; categories: CategoryOption[] }>("/api/admin/categories", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createSubSubcategory(
+  subcategoryId: number,
+  payload: {
+    subSubcategoryName: string;
+  },
+) {
+  return request<{ ok: true; categories: CategoryOption[] }>(
+    `/api/admin/subcategories/${subcategoryId}/sub-subcategories`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function deleteSubcategory(subcategoryId: number) {
+  return request<{ ok: true; categories: CategoryOption[] }>(`/api/admin/subcategories/${subcategoryId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteSubSubcategory(subSubcategoryId: number) {
+  return request<{ ok: true; categories: CategoryOption[] }>(
+    `/api/admin/sub-subcategories/${subSubcategoryId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export async function updateProduct(
+  productId: number,
+  payload: {
+    name: string;
+    category: string;
+    subcategory: string;
+    subSubcategory: string;
+    description: string;
+    image: string;
+    price: number;
+    stock: number;
+  },
+) {
+  return request<{ ok: true; products: Product[] }>(`/api/admin/products/${productId}`, {
+    method: "PUT",
     body: JSON.stringify(payload),
   });
 }

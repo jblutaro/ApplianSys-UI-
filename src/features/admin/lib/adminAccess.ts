@@ -17,5 +17,10 @@ export function isAdminUser(user: AppUser | null) {
       : undefined;
   const envAdmins = parseAdminEmails(adminEmails);
 
-  return user.role === "admin" || envAdmins.includes(email) || email.startsWith("admin");
+  return (
+    user.role === "admin" ||
+    user.role === "staff" ||
+    envAdmins.includes(email) ||
+    email.startsWith("admin")
+  );
 }

@@ -1,92 +1,163 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CATEGORIES } from "../categoryConfig";
+import {
+  fetchCatalogCategories,
+  fetchCatalogProducts,
+  type CatalogCategory,
+  type CatalogProduct,
+} from "../lib/catalogApi";
 import "@/shared/styles/Category.css";
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-PH", {
+    currency: "PHP",
+    style: "currency",
+  }).format(value);
+}
 
 function CategoryPage() {
   const { categorySlug, subSlug } = useParams<{
     categorySlug: string;
     subSlug?: string;
   }>();
-
-  const category = CATEGORIES.find((c) => c.slug === categorySlug);
-
   const [sortBy, setSortBy] = useState("popularity");
   const [perPage, setPerPage] = useState(6);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  if (!category) {
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [categoryResponse, productResponse] = await Promise.all([
+          fetchCatalogCategories(),
+          fetchCatalogProducts(),
+        ]);
+
+        if (!cancelled) {
+          setCategories(categoryResponse.categories);
+          setProducts(productResponse.products);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(error instanceof Error ? error.message : "Failed to load products.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const category = categories.find((item) => slugify(item.name) === categorySlug);
+  const activeSub = category?.subcategories.find((item) => slugify(item.name) === subSlug);
+  const categoryProducts = useMemo(
+    () => (category ? products.filter((product) => slugify(product.category) === slugify(category.name)) : []),
+    [category, products],
+  );
+  const visibleProducts = useMemo(() => {
+    const filtered = activeSub
+      ? categoryProducts.filter((product) => slugify(product.subcategory) === slugify(activeSub.name))
+      : categoryProducts;
+    const sorted = [...filtered];
+
+    if (sortBy === "price-asc") {
+      sorted.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "price-desc") {
+      sorted.sort((a, b) => b.price - a.price);
+    } else if (sortBy === "newest") {
+      sorted.sort((a, b) => b.dbId - a.dbId);
+    }
+
+    return sorted.slice(0, perPage);
+  }, [activeSub, categoryProducts, perPage, sortBy]);
+
+  if (!isLoading && !category) {
     return (
       <div className="cat-page">
         <p>Category not found.</p>
-        <Link to="/">← Back to Home</Link>
+        <Link to="/">Back to Home</Link>
       </div>
     );
   }
 
-  const activeSub = category.subcategories.find((s) => s.slug === subSlug);
-  const pageTitle = activeSub ? activeSub.label : category.label;
-
-  // Breadcrumb segments
+  const pageTitle = activeSub ? activeSub.name : category?.name ?? "Category";
   const crumbs = [
     { label: "Home", to: "/" },
-    { label: category.label, to: `/category/${category.slug}` },
-    ...(activeSub
-      ? [{ label: activeSub.label, to: `/category/${category.slug}/${activeSub.slug}` }]
+    ...(category ? [{ label: category.name, to: `/category/${slugify(category.name)}` }] : []),
+    ...(category && activeSub
+      ? [{ label: activeSub.name, to: `/category/${slugify(category.name)}/${slugify(activeSub.name)}` }]
       : []),
   ];
 
   return (
     <div className="cat-page">
-      {/* Breadcrumb */}
       <nav className="cat-breadcrumb" aria-label="breadcrumb">
-        {crumbs.map((c, i) => (
-          <span key={c.to} className="cat-breadcrumb__item">
-            {i < crumbs.length - 1 ? (
+        {crumbs.map((crumb, index) => (
+          <span key={crumb.to} className="cat-breadcrumb__item">
+            {index < crumbs.length - 1 ? (
               <>
-                <Link to={c.to} className="cat-breadcrumb__link">{c.label}</Link>
-                <span className="cat-breadcrumb__sep">›</span>
+                <Link to={crumb.to} className="cat-breadcrumb__link">
+                  {crumb.label}
+                </Link>
+                <span className="cat-breadcrumb__sep">&gt;</span>
               </>
             ) : (
-              <span className="cat-breadcrumb__current">{c.label}</span>
+              <span className="cat-breadcrumb__current">{crumb.label}</span>
             )}
           </span>
         ))}
       </nav>
 
       <div className="cat-layout">
-        {/* Sidebar */}
         <aside className="cat-sidebar">
           <Link to="/" className="cat-sidebar__show-all">
-            Show all Categories <span>›</span>
+            Show all Categories <span>&gt;</span>
           </Link>
 
-          {category.subcategories.length > 0 && (
+          {category?.subcategories.length ? (
             <>
-              <p className="cat-sidebar__group-label">{category.label}</p>
+              <p className="cat-sidebar__group-label">{category.name}</p>
               <ul className="cat-sidebar__list">
                 {category.subcategories.map((sub) => {
-                  const isActive = sub.slug === subSlug;
+                  const subcategorySlug = slugify(sub.name);
+                  const isActive = subcategorySlug === subSlug;
                   return (
-                    <li key={sub.slug}>
+                    <li key={sub.id}>
                       <Link
-                        to={`/category/${category.slug}/${sub.slug}`}
+                        to={`/category/${slugify(category.name)}/${subcategorySlug}`}
                         className={`cat-sidebar__item${isActive ? " cat-sidebar__item--active" : ""}`}
                       >
-                        {sub.label}
+                        {sub.name}
                       </Link>
                     </li>
                   );
                 })}
               </ul>
             </>
-          )}
+          ) : null}
         </aside>
 
-        {/* Main content */}
         <main className="cat-main">
           <h1 className="cat-main__title">{pageTitle}</h1>
 
-          {/* Toolbar */}
           <div className="cat-toolbar">
             <div className="cat-toolbar__left">
               <span className="cat-toolbar__label">Sort by:</span>
@@ -94,7 +165,7 @@ function CategoryPage() {
                 <select
                   className="cat-toolbar__select"
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(event) => setSortBy(event.target.value)}
                 >
                   <option value="popularity">popularity</option>
                   <option value="price-asc">price: low to high</option>
@@ -108,7 +179,7 @@ function CategoryPage() {
                 <select
                   className="cat-toolbar__select cat-toolbar__select--sm"
                   value={perPage}
-                  onChange={(e) => setPerPage(Number(e.target.value))}
+                  onChange={(event) => setPerPage(Number(event.target.value))}
                 >
                   <option value={6}>6</option>
                   <option value={12}>12</option>
@@ -116,22 +187,57 @@ function CategoryPage() {
                 </select>
               </div>
             </div>
+          </div>
 
-            <div className="cat-toolbar__pagination">
-              <button type="button" className="cat-toolbar__page-btn" disabled>1</button>
-              <span className="cat-toolbar__page-of">of 1</span>
-              <button type="button" className="cat-toolbar__page-arrow" disabled>→</button>
+          {isLoading ? (
+            <div className="cat-empty">
+              <p className="cat-empty__text">Loading products...</p>
             </div>
-          </div>
+          ) : null}
 
-          {/* Empty product grid */}
-          <div className="cat-empty">
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" aria-hidden>
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <path d="M8 21h8M12 17v4"/>
-            </svg>
-            <p className="cat-empty__text">No products yet.</p>
-          </div>
+          {errorMessage ? (
+            <div className="cat-empty">
+              <p className="cat-empty__text">{errorMessage}</p>
+            </div>
+          ) : null}
+
+          {!isLoading && !errorMessage && visibleProducts.length > 0 ? (
+            <div className="cat-grid">
+              {visibleProducts.map((product) => (
+                <article key={product.id} className="cat-product-card">
+                  <div className="cat-product-card__img">
+                    {product.image ? (
+                      <img src={product.image} alt={product.name} />
+                    ) : (
+                      <span>{product.subcategory}</span>
+                    )}
+                  </div>
+                  <div className="cat-product-card__body">
+                    <p className="cat-product-card__subcategory">
+                      {product.subSubcategory
+                        ? `${product.subcategory} / ${product.subSubcategory}`
+                        : product.subcategory}
+                    </p>
+                    <h2 className="cat-product-card__name">{product.name}</h2>
+                    <p className="cat-product-card__description">
+                      {product.description || "No description available."}
+                    </p>
+                    <strong className="cat-product-card__price">{formatCurrency(product.price)}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {!isLoading && !errorMessage && visibleProducts.length === 0 ? (
+            <div className="cat-empty">
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" aria-hidden>
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4" />
+              </svg>
+              <p className="cat-empty__text">No products yet.</p>
+            </div>
+          ) : null}
         </main>
       </div>
     </div>

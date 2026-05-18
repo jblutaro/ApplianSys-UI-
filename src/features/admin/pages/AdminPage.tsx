@@ -17,8 +17,16 @@ type AdminPageProps = {
   onAuthOpen: () => void;
 };
 
-function getSection(sectionParam: string | null): AdminSection {
-  return NAV_ITEMS.some((item) => item.key === sectionParam)
+function getNavItems(user: AppUser) {
+  if (user.role === "staff") {
+    return NAV_ITEMS.filter((item) => item.key !== "platform");
+  }
+
+  return NAV_ITEMS;
+}
+
+function getSection(sectionParam: string | null, navItems: typeof NAV_ITEMS): AdminSection {
+  return navItems.some((item) => item.key === sectionParam)
     ? (sectionParam as AdminSection)
     : "dashboard";
 }
@@ -26,19 +34,32 @@ function getSection(sectionParam: string | null): AdminSection {
 function renderSectionContent({
   section,
   state,
+  user,
 }: {
   section: AdminSection;
   state: ReturnType<typeof useAdminDashboard>;
+  user: AppUser;
 }) {
   switch (section) {
     case "products":
       return (
         <ProductsSection
           products={state.products}
+          categories={state.categories}
+          categoryDraft={state.categoryDraft}
           draft={state.productDraft}
           setDraft={state.setProductDraft}
+          setCategoryDraft={state.setCategoryDraft}
           onAddProduct={state.handleAddProduct}
+          onAddCategory={state.handleAddCategory}
+          onAddSubSubcategory={state.handleAddSubSubcategory}
+          onCancelEdit={state.handleCancelEditProduct}
           onDeleteProduct={state.handleDeleteProduct}
+          onDeleteSubcategory={state.handleDeleteSubcategory}
+          onDeleteSubSubcategory={state.handleDeleteSubSubcategory}
+          onEditProduct={state.handleEditProduct}
+          isEditing={state.editingProductId !== null}
+          canManageCategories={user.role === "admin"}
         />
       );
     case "orders":
@@ -77,9 +98,6 @@ function renderSectionContent({
 function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const section = getSection(searchParams.get("section"));
-  const currentSectionLabel =
-    NAV_ITEMS.find((item) => item.key === section)?.label ?? "Dashboard";
   const isAllowed = isAdminUser(user);
 
   const state = useAdminDashboard({
@@ -89,8 +107,8 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   if (!user) {
     return (
       <AdminAccessState
-        title="Admin sign-in required"
-        body="Sign in with your admin account to manage products, orders, reports, and platform controls."
+        title="Panel sign-in required"
+        body="Sign in with your admin or staff account to manage products, orders, reports, and controls."
         actionLabel="Sign in"
         onAction={onAuthOpen}
         showBackLink
@@ -101,10 +119,10 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   if (!isAllowed) {
     return (
       <AdminAccessState
-        title="Admin access only"
+        title="Admin or staff access only"
         body={
           <>
-            Your current account is signed in, but it is not marked as an admin. Add the email to
+            Your current account is signed in, but it is not marked as admin or staff. Add the email to
             <code> VITE_ADMIN_EMAILS </code>
             or use an email that starts with <code>admin</code>.
           </>
@@ -117,19 +135,24 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
     );
   }
 
+  const navItems = getNavItems(user);
+  const section = getSection(searchParams.get("section"), navItems);
+  const currentSectionLabel =
+    navItems.find((item) => item.key === section)?.label ?? "Dashboard";
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar__top">
           <div className="admin-brand">
-            <h1 className="admin-brand__title">ApplianSys Admin</h1>
+            <h1 className="admin-brand__title">ApplianSys Panel</h1>
             <span className="admin-brand__text">
-              Control the storefront, orders, products, and platform behavior.
+              Control the storefront, orders, products, and account tools.
             </span>
           </div>
 
           <nav className="admin-sidebar__nav">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <button
                 key={item.key}
                 type="button"
@@ -159,13 +182,13 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
           <div>
             <h1 className="admin-toolbar__title">{currentSectionLabel}</h1>
             <p className="admin-toolbar__sub">
-              Admin tools for shaping the live ApplianSys platform.
+              Management tools for shaping the live ApplianSys storefront.
             </p>
           </div>
 
           <div className="admin-toolbar__actions">
             <span className="admin-chip">
-              {state.settings.maintenanceMode ? "Maintenance mode on" : "Platform live"}
+              {state.settings.maintenanceMode ? "Maintenance mode on" : "Storefront live"}
             </span>
             {section === "dashboard" ? (
               <button
@@ -193,7 +216,7 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
           </div>
         ) : null}
 
-        {renderSectionContent({ section, state })}
+        {renderSectionContent({ section, state, user })}
       </main>
     </div>
   );

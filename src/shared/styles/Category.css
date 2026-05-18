@@ -258,6 +258,30 @@
     margin: 0;
 }
 
+.cat-product-card__subcategory {
+    margin: 0 0 6px;
+    color: var(--primary-gold);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.cat-product-card__description {
+    display: -webkit-box;
+    min-height: 42px;
+    margin: 8px 0 12px;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.cat-product-card__price {
+    color: var(--text-main);
+    font-size: 15px;
+}
+
 /* Empty state */
 .cat-empty {
     display: flex;

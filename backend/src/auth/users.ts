@@ -63,8 +63,22 @@ export function isAdminEmail(email: string) {
   return envAdmins.includes(normalizedEmail) || normalizedEmail.startsWith("admin");
 }
 
+export function isStaffUser(user: Pick<AuthUserRow, "user_type">) {
+  return (user.user_type ?? "").toLowerCase() === "staff";
+}
+
 export function isAdminUser(user: Pick<AuthUserRow, "email" | "user_type">) {
   return (user.user_type ?? "").toLowerCase() === "admin" || isAdminEmail(user.email);
+}
+
+export function isStaffOrAdminUser(user: Pick<AuthUserRow, "email" | "user_type">) {
+  return isAdminUser(user) || isStaffUser(user);
+}
+
+function mapRole(user: Pick<AuthUserRow, "email" | "user_type">) {
+  if (isAdminUser(user)) return "admin";
+  if (isStaffUser(user)) return "staff";
+  return "customer";
 }
 
 export function mapPublicUser(user: AuthUserRow, authSource: AuthSource) {
@@ -75,7 +89,7 @@ export function mapPublicUser(user: AuthUserRow, authSource: AuthSource) {
     email: user.email,
     id: user.user_id,
     photoURL: null,
-    role: isAdminUser(user) ? "admin" : "customer",
+    role: mapRole(user),
   };
 }
 
@@ -98,7 +112,7 @@ export function mapAccountProfile(user: AuthUserProfileRow) {
     firstName: user.fname ?? "",
     lastLogin: normalizeDateValue(user.last_login),
     middleName: user.mname ?? "",
-    role: isAdminUser(user) ? "admin" : "customer",
+    role: mapRole(user),
     status: user.status ?? "Active",
     lastName: user.lname ?? "",
   };
@@ -140,23 +154,36 @@ export async function findUserProfileById(userId: number): Promise<AuthUserProfi
   return rows[0] ?? null;
 }
 
-export async function createLocalUser(email: string, passwordHash: string): Promise<AuthUserRow> {
+export async function createLocalUser(
+  email: string,
+  passwordHash: string,
+  profile?: {
+    contactNumber?: string;
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+  },
+): Promise<AuthUserRow> {
   const normalizedEmail = normalizeEmail(email);
   const localName = normalizedEmail.split("@")[0] || "user";
   const userType = isAdminEmail(normalizedEmail) ? "admin" : "customer";
   const accountId = generateAccountId(userType);
+  const firstName = profile?.firstName?.trim() || localName;
+  const middleName = profile?.middleName?.trim() ?? "";
+  const lastName = profile?.lastName?.trim() || "";
+  const contactNumber = profile?.contactNumber?.trim() ?? "";
   const [result] = await dbPool.query<ResultSetHeader>(
     `INSERT INTO \`USER\`
       (account_id, fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`,
     [
       accountId,
-      localName,
-      "",
-      "",
+      firstName,
+      middleName,
+      lastName,
       normalizedEmail,
       passwordHash,
-      "",
+      contactNumber,
       "Active",
       userType,
     ],

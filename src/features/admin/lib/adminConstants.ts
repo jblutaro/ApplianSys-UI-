@@ -10,15 +10,56 @@ export const NAV_ITEMS: { key: AdminSection; label: string }[] = [
   { key: "settings", label: "Settings" },
 ];
 
-export const PRODUCT_CATEGORIES = [
-  "Kitchen",
-  "Cleaning",
-  "Cooling",
-  "Entertainment",
-  "Home",
-  "Office",
-  "Personal Care",
-  "Household",
+export const PRODUCT_CATEGORY_OPTIONS = [
+  {
+    label: "Kitchen",
+    subcategories: [
+      "Rice Cookers",
+      "Microwaves",
+      "Microwave Ovens",
+      "Air Fryers",
+      "Coffee Makers",
+      "Blenders",
+      "Refrigerators",
+      "Induction Cookers",
+    ],
+  },
+  {
+    label: "Cleaning",
+    subcategories: [
+      "Vacuum Cleaners",
+      "Washing Machines",
+      "Dishwashers",
+      "Air Purifiers",
+      "Shavers",
+      "Hair Dryers",
+      "Hair Straighteners",
+    ],
+  },
+  {
+    label: "Cooling",
+    subcategories: ["Electric Fans", "Air Conditioners", "Air Coolers"],
+  },
+  {
+    label: "Entertainment",
+    subcategories: ["Audio", "Visuals", "Gaming", "Televisions", "Speakers"],
+  },
+  {
+    label: "Personal Care",
+    subcategories: ["Shavers", "Hair Dryers", "Hair Straighteners"],
+  },
+  {
+    label: "Household",
+    subcategories: ["Air Purifiers", "Fans", "Small Appliances"],
+  },
+  {
+    label: "Office",
+    subcategories: ["Printers", "Coffee Makers", "Office Fans"],
+  },
+  {
+    label: "Home",
+    subcategories: ["Air Purifiers", "Fans", "Home Comfort"],
+  },
 ] as const;
 
 export const EMPTY_SETTINGS: AdminSettings = {
@@ -37,6 +78,10 @@ export const EMPTY_PRODUCT_DRAFT: Product = {
   dbId: 0,
   name: "",
   category: "",
+  subcategory: "",
+  subSubcategory: "",
+  description: "",
+  image: "",
   price: 0,
   stock: 0,
   status: "Active",

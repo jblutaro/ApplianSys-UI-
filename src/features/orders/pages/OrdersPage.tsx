@@ -62,9 +62,9 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
           <path d="M5 21V7l8-4 6 4v14"/>
           <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
         </svg>
-        <h2 className="orders-page__title">Admins do not have customer orders</h2>
+        <h2 className="orders-page__title">Management accounts do not have customer orders</h2>
         <p className="orders-empty__text">
-          Admin accounts are limited to management work. Review storefront orders inside the admin panel instead.
+          Admin and staff accounts are limited to management work. Review storefront orders inside the panel instead.
         </p>
         <Link to="/admin?section=orders" className="orders-empty__btn orders-empty__btn-link">
           Open Order Management

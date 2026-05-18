@@ -85,11 +85,25 @@
     line-height: 1.6;
 }
 
+.settings-card__note--error {
+    background: rgba(180, 73, 40, 0.12);
+    color: #8c3118;
+}
+
+.settings-card__note--success {
+    background: rgba(13, 138, 92, 0.12);
+    color: #0d7a53;
+}
+
 .settings-account__hero {
     display: flex;
     align-items: center;
     gap: 16px;
     margin-bottom: 22px;
+}
+
+.settings-account__hero > div:last-child {
+    min-width: 0;
 }
 
 .settings-account__avatar {
@@ -115,7 +129,7 @@
 .settings-account__email {
     margin-top: 4px;
     color: var(--text-muted);
-    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .settings-account__facts {
@@ -125,8 +139,9 @@
 }
 
 .settings-account__fact {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
     gap: 18px;
     padding-bottom: 14px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -136,6 +151,7 @@
     font-size: 13px;
     font-weight: 700;
     color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .settings-account__fact dd {
@@ -144,12 +160,24 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-main);
+    overflow-wrap: anywhere;
+}
+
+.settings-account__fact--account-id dd {
+    align-self: center;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: clamp(10px, 2.6vw, 12px);
+    letter-spacing: 0;
+    line-height: 1.2;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .settings-account__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    margin-top: 18px;
 }
 
 .settings-account__action {
@@ -167,6 +195,11 @@
     transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
+.settings-account__action:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
 .settings-account__action:hover {
     background: #fff7ef;
     border-color: rgba(170, 109, 39, 0.28);
@@ -182,6 +215,11 @@
 .settings-account__action--primary:hover {
     background: var(--primary-gold-hover);
     border-color: var(--primary-gold-hover);
+}
+
+.settings-account__form {
+    display: grid;
+    gap: 14px;
 }
 
 .settings-preferences__group {
@@ -287,6 +325,7 @@
 
 .settings-field__input {
     width: 100%;
+    box-sizing: border-box;
     min-height: 46px;
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 14px;
@@ -395,6 +434,11 @@
     .settings-card {
         padding: 18px;
         border-radius: 20px;
+    }
+
+    .settings-account__fact {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
     }
 
     .settings-preferences__grid {

@@ -64,15 +64,38 @@ export async function authenticateLocalUser(
   return (await findUserById(user.user_id)) ?? user;
 }
 
-export async function registerLocalUser(email: string, password: string): Promise<AuthUserRow> {
+export async function registerLocalUser(
+  email: string,
+  password: string,
+  profile?: {
+    contactNumber: string;
+    firstName: string;
+    lastName: string;
+    middleName: string;
+  },
+): Promise<AuthUserRow> {
   const normalizedEmail = normalizeEmail(email);
   const existingUser = await findUserByEmail(normalizedEmail);
   if (existingUser) {
     throw new AuthServiceError(409, "An account with that email already exists.");
   }
 
+  const firstName = profile?.firstName.trim() ?? "";
+  const lastName = profile?.lastName.trim() ?? "";
+  const middleName = profile?.middleName.trim() ?? "";
+  const contactNumber = profile?.contactNumber.trim() ?? "";
+
+  if (!firstName || !lastName) {
+    throw new AuthServiceError(400, "First name and last name are required.");
+  }
+
   const passwordHash = await hashPassword(password);
-  return createLocalUser(normalizedEmail, passwordHash);
+  return createLocalUser(normalizedEmail, passwordHash, {
+    contactNumber,
+    firstName,
+    lastName,
+    middleName,
+  });
 }
 
 export async function getAccountProfile(userId: number) {

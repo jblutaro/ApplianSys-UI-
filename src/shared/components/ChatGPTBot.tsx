@@ -46,9 +46,10 @@ export default function ChatGPTBot() {
                 key={`${message.role}-${index}`}
                 className={`chatbot-message ${message.role}`}
               >
-                {message.text || (isLoading ? "..." : "")}
+                {message.text}
               </div>
             ))}
+            {isLoading ? <div className="chatbot-message assistant">...</div> : null}
             <div ref={messagesEndRef} />
           </div>
 

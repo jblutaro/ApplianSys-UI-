@@ -7,7 +7,28 @@ export type AppUser = {
   email: string;
   id: number;
   photoURL: string | null;
-  role: "admin" | "customer";
+  role: "admin" | "staff" | "customer";
+};
+
+export type SignUpProfile = {
+  contactNumber: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
+};
+
+export type AccountProfile = {
+  accountId: string;
+  contactNumber: string;
+  createdAt: string | null;
+  displayName: string;
+  email: string;
+  firstName: string;
+  lastLogin: string | null;
+  lastName: string;
+  middleName: string;
+  role: AppUser["role"];
+  status: string;
 };
 
 type AuthResponse = {
@@ -63,14 +84,46 @@ export async function signInWithEmail(email: string, password: string): Promise<
   return response.user;
 }
 
-export async function signUpWithEmail(email: string, password: string): Promise<AppUser | null> {
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  profile: SignUpProfile,
+): Promise<AppUser | null> {
   const response = await requestJson<AuthResponse>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...profile }),
   });
 
   emit(response.user);
   return response.user;
+}
+
+export async function fetchAccountProfile() {
+  return requestJson<{ ok: true; account: AccountProfile }>("/api/auth/account");
+}
+
+export async function updateAccountProfile(payload: {
+  contactNumber: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
+}) {
+  const response = await requestJson<{ ok: true; account: AccountProfile }>("/api/auth/account", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+  if (currentUser) {
+    emit({
+      ...currentUser,
+      accountId: response.account.accountId,
+      displayName: response.account.displayName,
+      email: response.account.email,
+      role: response.account.role,
+    });
+  }
+
+  return response;
 }
 
 export async function signOutUser(): Promise<void> {

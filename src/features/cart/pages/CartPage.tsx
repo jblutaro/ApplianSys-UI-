@@ -34,12 +34,12 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
           <path d="M5 21V7l8-4 6 4v14"/>
           <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
         </svg>
-        <h2 className="cart-auth-wall__title">Admins cannot use the shopping cart</h2>
+        <h2 className="cart-auth-wall__title">Management accounts cannot use the shopping cart</h2>
         <p className="cart-auth-wall__sub">
-          Admin accounts are restricted to platform duties. Use the admin panel to manage the storefront.
+          Admin and staff accounts are restricted to management duties. Use the panel to manage the storefront.
         </p>
         <Link to="/admin" className="cart-auth-wall__btn cart-auth-wall__btn-link">
-          Open Admin Panel
+          Open Panel
         </Link>
       </div>
     );

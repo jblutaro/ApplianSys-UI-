@@ -5,9 +5,26 @@ export type AdminProduct = {
   dbId: number;
   name: string;
   category: string;
+  subcategory: string;
+  subSubcategory: string;
+  description: string;
+  image: string;
   price: number;
   stock: number;
   status: string;
+};
+
+export type AdminCategoryOption = {
+  id: number;
+  name: string;
+  subcategories: {
+    id: number;
+    name: string;
+    subSubcategories: {
+      id: number;
+      name: string;
+    }[];
+  }[];
 };
 
 export type AdminOrder = {

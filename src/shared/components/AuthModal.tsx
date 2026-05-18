@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { AuthAccountPanel } from "@/shared/components/auth/AuthAccountPanel";
 import { AuthCredentialsForm } from "@/shared/components/auth/AuthCredentialsForm";
 import {
@@ -21,6 +21,10 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
   const titleId = useId();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,22 +32,37 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
+  const clearCredentialForm = useCallback(() => {
+    setEmail("");
+    setFirstName("");
+    setMiddleName("");
+    setLastName("");
+    setContactNumber("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+    setShowConfirm(false);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (!user) {
+      clearCredentialForm();
+    }
     setError(null);
     setBusy(false);
-  }, [open, mode]);
+    onClose();
+  }, [clearCredentialForm, onClose, user]);
 
   useEffect(() => {
     if (!open) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [handleClose, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,11 +93,17 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
       if (mode === "login") {
         authenticatedUser = await signInWithEmail(email.trim(), password);
       } else {
-        authenticatedUser = await signUpWithEmail(email.trim(), password);
+        authenticatedUser = await signUpWithEmail(email.trim(), password, {
+          contactNumber,
+          firstName,
+          lastName,
+          middleName,
+        });
       }
 
       onAuthenticated(authenticatedUser);
-      onClose();
+      clearCredentialForm();
+      handleClose();
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -90,8 +115,20 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
     }
   };
 
+  const handleModeChange = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setError(null);
+    setBusy(false);
+    clearCredentialForm();
+  };
+
+  const handleSignOut = async () => {
+    await signOutUser();
+    clearCredentialForm();
+  };
+
   return (
-    <div className="auth-modal-overlay" role="presentation" onClick={onClose}>
+    <div className="auth-modal-overlay" role="presentation" onClick={handleClose}>
       <div
         className="auth-modal"
         role="dialog"
@@ -102,7 +139,7 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
         <button
           type="button"
           className="auth-modal__close"
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close"
         >
           x
@@ -111,8 +148,8 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
         {user ? (
           <AuthAccountPanel
             busy={busy}
-            onClose={onClose}
-            onSignOut={signOutUser}
+            onClose={handleClose}
+            onSignOut={handleSignOut}
             setError={setError}
             setBusy={setBusy}
             titleId={titleId}
@@ -122,14 +159,22 @@ export function AuthModal({ open, onAuthenticated, onClose, user }: AuthModalPro
           <AuthCredentialsForm
             busy={busy}
             confirmPassword={confirmPassword}
+            contactNumber={contactNumber}
             email={email}
             error={error}
+            firstName={firstName}
+            lastName={lastName}
+            middleName={middleName}
             mode={mode}
             onSubmit={handleSubmit}
             password={password}
             setConfirmPassword={setConfirmPassword}
+            setContactNumber={setContactNumber}
             setEmail={setEmail}
-            setMode={setMode}
+            setFirstName={setFirstName}
+            setLastName={setLastName}
+            setMiddleName={setMiddleName}
+            setMode={handleModeChange}
             setPassword={setPassword}
             setShowConfirm={setShowConfirm}
             setShowPassword={setShowPassword}

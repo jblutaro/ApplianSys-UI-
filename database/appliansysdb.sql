@@ -65,6 +65,8 @@ CREATE TABLE PRODUCT (
     sub_subcategory_id     INT NULL,
     product_name           VARCHAR(150) NOT NULL,
     product_description    TEXT,
+    image_url              VARCHAR(500),
+    product_image          LONGTEXT,
     price                  DECIMAL(10,2) NOT NULL,
 
     CONSTRAINT fk_product_subcategory

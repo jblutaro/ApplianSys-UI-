@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { clearSession, readSession } from "./session.js";
-import { findUserById, isActiveStatus, isAdminUser } from "./users.js";
+import { findUserById, isActiveStatus, isStaffOrAdminUser } from "./users.js";
 
 export async function requireAuthenticated(req: Request, res: Response, next: NextFunction) {
   try {
@@ -38,8 +38,8 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    if (!isAdminUser(user)) {
-      res.status(403).json({ ok: false, message: "Admin access required." });
+    if (!isStaffOrAdminUser(user)) {
+      res.status(403).json({ ok: false, message: "Admin or staff access required." });
       return;
     }
 

@@ -1,21 +1,65 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  fetchCatalogCategories,
+  fetchCatalogProducts,
+  type CatalogCategory,
+  type CatalogProduct,
+} from "@/features/category/lib/catalogApi";
 
-const CATEGORY_CARDS = [
-  { slug: "kitchen",       className: "kitchen",       title: "Kitchen Appliances",  subtitle: "Cook smarter, live better",     label: "Kitchen" },
-  { slug: "cleaning",      className: "cleaning",      title: "Cleaning Appliances", subtitle: "Effortless home maintenance",   label: "Cleaning" },
-  { slug: "cooling",       className: "cooling",       title: "Cooling & Heating",   subtitle: "Perfect climate control",       label: "Cooling" },
-  { slug: "entertainment", className: "entertainment", title: "Entertainment",       subtitle: "Elevate your experience",       label: "Entertainment" },
-];
-
-const BEST_SELLER_CARDS = [
-  { slug: "personal",  className: "personal",  title: "Personal Care",     subtitle: "Your daily essentials",  label: "Personal" },
-  { slug: "household", className: "household", title: "Small Household",   subtitle: "Compact solutions",      label: "Household" },
-  { slug: "office",    className: "office",    title: "Office Appliances", subtitle: "Productivity boosters",  label: "Office" },
-  { slug: "home",      className: "home",      title: "Home Appliances",   subtitle: "Complete your home",     label: "Home" },
-];
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function SearchPage() {
   const navigate = useNavigate();
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [imageStep, setImageStep] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [categoryResponse, productResponse] = await Promise.all([
+          fetchCatalogCategories(),
+          fetchCatalogProducts(),
+        ]);
+        if (!cancelled) {
+          setCategories(categoryResponse.categories);
+          setProducts(productResponse.products);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setImageStep((current) => current + 1);
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const getCategoryImages = (categoryName: string) =>
+    products
+      .filter((product) => slugify(product.category) === slugify(categoryName) && product.image)
+      .map((product) => product.image);
 
   return (
     <div className="home-page">
@@ -30,45 +74,38 @@ function SearchPage() {
 
       <section className="featured-section">
         <h2 className="section-title">Explore Our Categories</h2>
-        <div className="photo-grid">
-          {CATEGORY_CARDS.map((c) => (
-            <div
-              key={c.slug}
-              className="photo-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/category/${c.slug}`)}
-              onKeyDown={(e) => e.key === "Enter" && navigate(`/category/${c.slug}`)}
+        {isLoading ? <p className="home-category-note">Loading categories...</p> : null}
+        {!isLoading && categories.length === 0 ? (
+          <p className="home-category-note">No categories yet.</p>
+        ) : null}
+        <div className="category-tilebox">
+          {categories.map((category) => {
+            const images = getCategoryImages(category.name);
+            const activeImage = images.length > 0 ? images[imageStep % images.length] : "";
+            return (
+            <button
+              key={category.id}
+              type="button"
+              className="category-tile"
+              onClick={() => {
+                void navigate(`/category/${slugify(category.name)}`);
+              }}
             >
-              <div className={`card-image ${c.className}`}>{c.label}</div>
-              <div className="card-content">
-                <h3 className="card-title">{c.title}</h3>
-                <p className="card-subtitle">{c.subtitle}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="discover-section">
-        <h2 className="section-title">Discover Our Best Sellers</h2>
-        <div className="photo-grid">
-          {BEST_SELLER_CARDS.map((c) => (
-            <div
-              key={c.slug}
-              className="photo-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/category/${c.slug}`)}
-              onKeyDown={(e) => e.key === "Enter" && navigate(`/category/${c.slug}`)}
-            >
-              <div className={`card-image ${c.className}`}>{c.label}</div>
-              <div className="card-content">
-                <h3 className="card-title">{c.title}</h3>
-                <p className="card-subtitle">{c.subtitle}</p>
-              </div>
-            </div>
-          ))}
+              <span
+                className="category-tile__media"
+                style={activeImage ? { backgroundImage: `url(${activeImage})` } : undefined}
+              >
+                <span className="category-tile__media-label">{category.name}</span>
+              </span>
+              <span className="category-tile__body">
+                <span className="category-tile__label">{category.name}</span>
+                <span className="category-tile__meta">
+                  {category.subcategories.length} subcategor{category.subcategories.length === 1 ? "y" : "ies"}
+                </span>
+              </span>
+            </button>
+            );
+          })}
         </div>
       </section>
     </div>

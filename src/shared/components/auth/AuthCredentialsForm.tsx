@@ -7,13 +7,21 @@ type AuthMode = "login" | "signup";
 type AuthCredentialsFormProps = {
   busy: boolean;
   confirmPassword: string;
+  contactNumber: string;
   email: string;
   error: string | null;
+  firstName: string;
+  lastName: string;
+  middleName: string;
   mode: AuthMode;
   onSubmit: (event: FormEvent) => Promise<void>;
   password: string;
   setConfirmPassword: (value: string) => void;
+  setContactNumber: (value: string) => void;
   setEmail: (value: string) => void;
+  setFirstName: (value: string) => void;
+  setLastName: (value: string) => void;
+  setMiddleName: (value: string) => void;
   setMode: (value: AuthMode) => void;
   setPassword: (value: string) => void;
   setShowConfirm: (value: boolean | ((value: boolean) => boolean)) => void;
@@ -26,13 +34,21 @@ type AuthCredentialsFormProps = {
 export function AuthCredentialsForm({
   busy,
   confirmPassword,
+  contactNumber,
   email,
   error,
+  firstName,
+  lastName,
+  middleName,
   mode,
   onSubmit,
   password,
   setConfirmPassword,
+  setContactNumber,
   setEmail,
+  setFirstName,
+  setLastName,
+  setMiddleName,
   setMode,
   setPassword,
   setShowConfirm,
@@ -54,6 +70,73 @@ export function AuthCredentialsForm({
       </p>
 
       <form className="auth-modal__form" onSubmit={(event) => void onSubmit(event)}>
+        {mode === "signup" ? (
+          <div className="auth-modal__grid">
+            <div>
+              <label className="auth-modal__label" htmlFor="auth-first-name">
+                First name
+              </label>
+              <div className="auth-modal__field-wrap">
+                <input
+                  id="auth-first-name"
+                  className="auth-modal__input"
+                  autoComplete="given-name"
+                  placeholder="Enter your first name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="auth-modal__label" htmlFor="auth-middle-name">
+                Middle name
+              </label>
+              <div className="auth-modal__field-wrap">
+                <input
+                  id="auth-middle-name"
+                  className="auth-modal__input"
+                  autoComplete="additional-name"
+                  placeholder="Optional"
+                  value={middleName}
+                  onChange={(event) => setMiddleName(event.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="auth-modal__label" htmlFor="auth-last-name">
+                Last name
+              </label>
+              <div className="auth-modal__field-wrap">
+                <input
+                  id="auth-last-name"
+                  className="auth-modal__input"
+                  autoComplete="family-name"
+                  placeholder="Enter your last name"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="auth-modal__label" htmlFor="auth-contact-number">
+                Contact number
+              </label>
+              <div className="auth-modal__field-wrap">
+                <input
+                  id="auth-contact-number"
+                  className="auth-modal__input"
+                  autoComplete="tel"
+                  placeholder="Enter your contact number"
+                  value={contactNumber}
+                  onChange={(event) => setContactNumber(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <label className="auth-modal__label" htmlFor="auth-email">
           Email
         </label>

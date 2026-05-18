@@ -20,6 +20,12 @@ const EMPTY_PROFILE: AdminAccountProfile = {
   status: "Active",
 };
 
+function getRoleLabel(role: AdminAccountProfile["role"]) {
+  if (role === "admin") return "Administrator";
+  if (role === "staff") return "Staff";
+  return "User";
+}
+
 function formatDateTime(value: string | null) {
   if (!value) return "Not available";
 
@@ -148,7 +154,7 @@ export function AdminAccountSection({ enabled }: AdminAccountSectionProps) {
         <div className="admin-card__header">
           <div>
             <h2 className="admin-card__title">Account Settings</h2>
-            <p className="admin-card__sub">Update your admin profile and account details.</p>
+            <p className="admin-card__sub">Update your management profile and account details.</p>
           </div>
         </div>
 
@@ -226,7 +232,7 @@ export function AdminAccountSection({ enabled }: AdminAccountSectionProps) {
             </div>
             <div className="admin-account-meta__item">
               <span>Role</span>
-              <strong>{account.role === "admin" ? "Administrator" : "User"}</strong>
+              <strong>{getRoleLabel(account.role)}</strong>
             </div>
             <div className="admin-account-meta__item">
               <span>Created</span>
@@ -252,7 +258,7 @@ export function AdminAccountSection({ enabled }: AdminAccountSectionProps) {
         <div className="admin-card__header">
           <div>
             <h2 className="admin-card__title">Security</h2>
-            <p className="admin-card__sub">Change your password and keep the admin account secure.</p>
+            <p className="admin-card__sub">Change your password and keep the management account secure.</p>
           </div>
         </div>
 
@@ -315,7 +321,7 @@ export function AdminAccountSection({ enabled }: AdminAccountSectionProps) {
           </div>
 
           <div className="admin-note">
-            Use at least 8 characters and avoid reusing the seeded default password on admin accounts.
+            Use at least 8 characters and avoid reusing the seeded default password on management accounts.
           </div>
 
           <button

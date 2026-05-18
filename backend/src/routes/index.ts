@@ -4,6 +4,7 @@ import { testDatabaseConnection } from "../config/database.js";
 import { adminRouter } from "./admin.js";
 import { authRouter } from "./auth.js";
 import { chatRouter } from "./chat.js";
+import { productsRouter } from "./products.js";
 
 export const apiRouter = Router();
 
@@ -28,4 +29,5 @@ apiRouter.get("/db-test", async (_req, res, next) => {
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/chat", chatRouter);
+apiRouter.use(productsRouter);
 apiRouter.use("/admin", requireAdmin, adminRouter);

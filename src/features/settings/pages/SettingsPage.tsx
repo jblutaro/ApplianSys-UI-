@@ -27,12 +27,12 @@ function SettingsPage({ onAuthOpen, user }: SettingsPageProps) {
           <path d="M5 21V7l8-4 6 4v14"/>
           <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
         </svg>
-        <h2 className="settings-auth-wall__title">Admin settings live inside the admin panel</h2>
+        <h2 className="settings-auth-wall__title">Management settings live inside the panel</h2>
         <p className="settings-auth-wall__sub">
-          Customer account settings are not available to admin accounts. Use the Platform section in the admin panel instead.
+          Customer account settings are not available to admin and staff accounts.
         </p>
-        <Link to="/admin?section=platform" className="settings-auth-wall__btn settings-auth-wall__btn-link">
-          Open Platform Settings
+        <Link to="/admin" className="settings-auth-wall__btn settings-auth-wall__btn-link">
+          Open Panel
         </Link>
       </div>
     );

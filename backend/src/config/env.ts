@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
+const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+dotenv.config({ path: path.join(backendRoot, ".env") });
 
 function readNumber(value: string | undefined, fallback: number) {
   const parsed = Number(value);

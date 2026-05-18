@@ -68,13 +68,17 @@ authRouter.post("/login", async (req, res, next) => {
 
 authRouter.post("/register", async (req, res, next) => {
   try {
-    const { email, password } = req.body as {
+    const { contactNumber, email, firstName, lastName, middleName, password } = req.body as {
+      contactNumber?: string;
       email?: string;
+      firstName?: string;
+      lastName?: string;
+      middleName?: string;
       password?: string;
     };
 
-    if (!email || !password) {
-      res.status(400).json({ ok: false, message: "Email and password are required." });
+    if (!email || !password || !firstName || !lastName) {
+      res.status(400).json({ ok: false, message: "First name, last name, email, and password are required." });
       return;
     }
 
@@ -83,7 +87,12 @@ authRouter.post("/register", async (req, res, next) => {
       return;
     }
 
-    const user = await registerLocalUser(email, password);
+    const user = await registerLocalUser(email, password, {
+      contactNumber: contactNumber ?? "",
+      firstName,
+      lastName,
+      middleName: middleName ?? "",
+    });
     const session = createSession(res, user.user_id);
 
     res.status(201).json({
