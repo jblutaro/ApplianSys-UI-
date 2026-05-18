@@ -118,7 +118,7 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
     throw new Error(body || "Request failed");
   }
 
-  return response.json() as Promise<T>;
+  return response.json() as unknown as Promise<T>;
 }
 
 export async function fetchAdminDashboard(period: ReportPeriod) {

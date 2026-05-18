@@ -1,11 +1,26 @@
 import { Router } from "express";
+import type { RowDataPacket } from "mysql2";
 import { readSession } from "../auth/session.js";
 import { findUserById, isActiveStatus, isStaffOrAdminUser } from "../auth/users.js";
 import { readAdminSettings } from "../data/adminSettingsStore.js";
+import { dbPool } from "../config/database.js";
 import { OLD_ALBAY_SHOP_LOCATION, placeOrder } from "../services/checkout/checkout.js";
 import type { CheckoutInput } from "../services/checkout/checkout.js";
 
 export const checkoutRouter = Router();
+
+type EmailOrderRow = RowDataPacket & {
+  email: string;
+  fname: string | null;
+  lname: string | null;
+  order_date: Date | string | null;
+  order_id: number;
+  payment_method: string | null;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total_amount: number;
+};
 
 const ALBAY_DELIVERY_BOUNDS = {
   north: 13.55,
@@ -106,6 +121,97 @@ checkoutRouter.get("/settings", async (_req, res, next) => {
         deliveryRatePerKm: settings.deliveryRatePerKm,
         shopLocation: OLD_ALBAY_SHOP_LOCATION,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
+  try {
+    const userId = await resolveCustomerUserId(req);
+    if (!userId) {
+      res.status(401).json({ ok: false, message: "Authentication required." });
+      return;
+    }
+
+    const { orderId, paidAt, receiptNumber } = req.body as {
+      orderId?: unknown;
+      paidAt?: unknown;
+      receiptNumber?: unknown;
+    };
+    const parsedOrderId = Number(orderId);
+
+    if (!Number.isInteger(parsedOrderId) || parsedOrderId <= 0 || typeof receiptNumber !== "string") {
+      res.status(400).json({ ok: false, message: "orderId and receiptNumber are required." });
+      return;
+    }
+
+    const [rows] = await dbPool.query<EmailOrderRow[]>(
+      `
+      SELECT
+        o.order_id,
+        o.order_date,
+        o.total_amount,
+        pd.payment_method,
+        u.email,
+        u.fname,
+        u.lname,
+        p.product_name,
+        oi.quantity,
+        oi.price
+      FROM orders o
+      INNER JOIN \`USER\` u ON u.user_id = o.user_id
+      LEFT JOIN PAYMENT_DETAILS pd ON pd.payment_id = o.payment_id
+      INNER JOIN order_item oi ON oi.order_id = o.order_id
+      INNER JOIN PRODUCT p ON p.product_id = oi.product_id
+      WHERE o.order_id = ? AND o.user_id = ?
+      ORDER BY oi.product_id ASC
+      `,
+      [parsedOrderId, userId],
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({ ok: false, message: "Order not found." });
+      return;
+    }
+
+    const first = rows[0];
+    const customerName = [first.fname, first.lname].filter(Boolean).join(" ") || first.email;
+    const paymentDate = typeof paidAt === "string" ? new Date(paidAt) : new Date();
+    const orderRef = `ORD-${String(first.order_id).padStart(4, "0")}`;
+    const currency = new Intl.NumberFormat("en-PH", { currency: "PHP", style: "currency" });
+    const items = rows.map((row) => ({
+      lineTotal: Number(row.price) * Number(row.quantity),
+      name: String(row.product_name),
+      price: Number(row.price),
+      quantity: Number(row.quantity),
+    }));
+
+    const emailText = [
+      "Mock purchase confirmation email",
+      `To: ${first.email}`,
+      `Customer: ${customerName}`,
+      `Order Reference: ${orderRef}`,
+      `Receipt Number: ${receiptNumber}`,
+      `Payment Method: Mock GCash`,
+      `Amount Paid: ${currency.format(Number(first.total_amount))}`,
+      `Date and Time Paid: ${paymentDate.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}`,
+      "",
+      "Purchased Items:",
+      ...items.map((item) => `- ${item.name} x${item.quantity} @ ${currency.format(item.price)} = ${currency.format(item.lineTotal)}`),
+      "",
+      `Order Total: ${currency.format(Number(first.total_amount))}`,
+      "Thank you for shopping with ApplianSys.",
+    ].join("\n");
+
+    console.info(emailText);
+
+    res.json({
+      ok: true,
+      delivered: false,
+      mode: "console-fallback",
+      message: "Mock confirmation email logged to backend console.",
     });
   } catch (error) {
     next(error);

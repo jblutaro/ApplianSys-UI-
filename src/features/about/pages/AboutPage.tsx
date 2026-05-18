@@ -1,57 +1,88 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { fetchSiteStats, type SiteStats } from "@/shared/lib/statsApi";
 import "@/shared/styles/About.css";
 
-const STATS = [
-  { value: "10,000+", label: "Products Listed" },
-  { value: "50,000+", label: "Happy Customers" },
-  { value: "200+",    label: "Trusted Brands" },
-  { value: "8",       label: "Product Categories" },
-];
+// ── Timeline is generated from live stats ──────────────────────────────────
+function buildTimeline(stats: SiteStats) {
+  const { foundedYear, firstOrderYear, latestOrderYear, categories, categoryNames, customers, products } = stats;
 
-const TIMELINE = [
-  {
-    year: "2020",
-    title: "Founded",
-    desc: "ApplianSys launched as a small online store focused on kitchen appliances, serving customers across Metro Manila.",
+  // Format a readable category list: "A, B, C and D"
+  function listCategories(names: string[]) {
+    if (names.length === 0) return "multiple categories";
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  }
+
+  const items = [
+    {
+      year: String(foundedYear),
+      title: "Founded",
+      desc: `ApplianSys launched as an online appliance store, serving customers with a growing catalog of home and kitchen products.`,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+    },
+  ];
+
+  // First orders milestone — only add if different from founded year
+  if (firstOrderYear > foundedYear) {
+    items.push({
+      year: String(firstOrderYear),
+      title: "First Orders",
+      desc: `Customers started placing orders, marking the beginning of our active sales journey across the Philippines.`,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      ),
+    });
+  }
+
+  // Catalog milestone — show current category spread
+  const catalogYear = Math.max(firstOrderYear, foundedYear + 1);
+  items.push({
+    year: String(catalogYear),
+    title: "Catalog Expanded",
+    desc: `Grew to ${categories} product ${categories === 1 ? "category" : "categories"} — ${listCategories(categoryNames)} — offering a wider selection for every home.`,
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        <polyline points="9 22 9 12 15 12 15 22" />
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21h8M12 17v4" />
       </svg>
     ),
-  },
-  {
-    year: "2021",
-    title: "Expanded Catalog",
-    desc: "Grew to 8 product categories and partnered with over 100 brands to offer a wider selection of home appliances.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    ),
-  },
-  {
-    year: "2022",
-    title: "50,000 Customers",
-    desc: "Reached a major milestone — 50,000 happy customers and launched our loyalty program and live chat support.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-  {
-    year: "2024",
-    title: "Full Platform Launch",
-    desc: "Launched the full e-commerce platform with admin tools, AI chat assistant, and real-time inventory management.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
-    ),
-  },
+  });
+
+  // Customer milestone
+  if (customers > 0) {
+    items.push({
+      year: String(latestOrderYear),
+      title: `${customers.toLocaleString()} Customers`,
+      desc: `Reached ${customers.toLocaleString()} registered customers and ${products.toLocaleString()} products listed — a testament to the trust our community places in us.`,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+    });
+  }
+
+  // Deduplicate by year — keep last entry per year
+  const seen = new Map<string, typeof items[number]>();
+  for (const item of items) seen.set(item.year, item);
+  return Array.from(seen.values()).sort((a, b) => Number(a.year) - Number(b.year));
+}
+
+// Skeleton placeholder items shown while loading
+const TIMELINE_SKELETON = [
+  { year: "····", title: "Loading…", desc: "" },
+  { year: "····", title: "Loading…", desc: "" },
+  { year: "····", title: "Loading…", desc: "" },
 ];
 
 const VALUES = [
@@ -99,32 +130,62 @@ const VALUES = [
 
 const TEAM = [
   {
-    name: "Maria Santos",
-    role: "Founder & CEO",
-    initial: "M",
-    bio: "Visionary behind ApplianSys with 12 years in retail and e-commerce.",
-  },
-  {
-    name: "James Reyes",
-    role: "Head of Product",
+    name: "John Ralph P. Bone",
+    role: "Lead Full-Stack Engineer",
     initial: "J",
-    bio: "Shapes the product roadmap and ensures every feature delights customers.",
+    bio: "Architected and built the core platform — from the database schema and REST API to the React frontend, admin panel, and checkout flow. The primary driver behind ApplianSys.",
+    highlight: true,
   },
   {
-    name: "Carla Mendoza",
-    role: "Lead Designer",
-    initial: "C",
-    bio: "Crafts the visual identity and user experience across the platform.",
+    name: "Jelaine Lutaro",
+    role: "Full-Stack Developer",
+    initial: "J",
+    bio: "Co-led development across the entire stack, owning key features including the cart system, order management, and the AI chat assistant integration.",
+    highlight: true,
   },
   {
-    name: "Paolo Cruz",
-    role: "Engineering Lead",
-    initial: "P",
-    bio: "Architects the tech stack and keeps the platform fast and reliable.",
+    name: "Harvey Belleza",
+    role: "Frontend Engineer",
+    initial: "H",
+    bio: "Built and refined the customer-facing UI components, product catalog pages, and responsive layouts across the storefront.",
+  },
+  {
+    name: "Arabella Briongos",
+    role: "UI/UX Designer & Frontend Developer",
+    initial: "A",
+    bio: "Designed the visual identity, component library, and user experience flows — translating wireframes into polished, accessible interfaces.",
+  },
+  {
+    name: "Emmanuel Jacob Nedia",
+    role: "Backend Developer & QA Engineer",
+    initial: "E",
+    bio: "Developed backend services and API routes, and led quality assurance efforts — writing tests and ensuring reliability across the platform.",
   },
 ];
 
 function AboutPage() {
+  const [stats, setStats] = useState<SiteStats | null>(null);
+
+  useEffect(() => {
+    void fetchSiteStats().then(setStats).catch(() => {
+      // Fall back to nulls — UI shows "—" placeholders
+    });
+  }, []);
+
+  function formatCount(n: number | undefined) {
+    if (n === undefined) return "—";
+    if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k+`;
+    return String(n);
+  }
+
+  const liveStats = [
+    { value: formatCount(stats?.products),   label: "Products Listed" },
+    { value: formatCount(stats?.customers),  label: "Happy Customers" },
+    { value: formatCount(stats?.categories), label: "Product Categories" },
+  ];
+
+  const timeline = stats ? buildTimeline(stats) : null;
+  const isLoading = stats === null;
   return (
     <div className="about-page">
 
@@ -188,7 +249,7 @@ function AboutPage() {
                 </svg>
               </div>
               <div className="about-hero__float-text">
-                <strong>50,000+</strong>
+                <strong>{formatCount(stats?.customers)}</strong>
                 <span>Happy Customers</span>
               </div>
             </div>
@@ -196,12 +257,13 @@ function AboutPage() {
             <div className="about-hero__float">
               <div className="about-hero__float-icon">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8M12 17v4" />
                 </svg>
               </div>
               <div className="about-hero__float-text">
-                <strong>200+ Brands</strong>
-                <span>Trusted Partners</span>
+                <strong>{formatCount(stats?.products)}</strong>
+                <span>Products Listed</span>
               </div>
             </div>
           </div>
@@ -210,8 +272,8 @@ function AboutPage() {
 
       {/* ── Stats band ── */}
       <section className="about-stats" aria-label="Key statistics">
-        {STATS.map((s) => (
-          <div key={s.label} className="about-stat">
+        {liveStats.map((s) => (
+          <div key={s.label} className={`about-stat${stats === null ? " about-stat--loading" : ""}`}>
             <span className="about-stat__value">{s.value}</span>
             <span className="about-stat__label">{s.label}</span>
           </div>
@@ -226,26 +288,50 @@ function AboutPage() {
           <p className="about-story__body">
             We believe every household deserves access to quality appliances that
             make daily life easier. ApplianSys bridges the gap between top-tier
-            brands and everyday consumers — offering a curated selection, honest
-            product information, and a seamless shopping experience.
+            brands and everyday consumers — offering a curated selection across{" "}
+            {stats ? (
+              <strong>{stats.categories} {stats.categories === 1 ? "category" : "categories"}</strong>
+            ) : (
+              <span className="about-story__inline-skeleton" aria-hidden />
+            )}{" "}
+            with honest product information and a seamless shopping experience.
           </p>
           <p className="about-story__body">
-            Whether you're upgrading your kitchen, refreshing your living room, or
-            outfitting a new home, we're here to guide you every step of the way.
+            With{" "}
+            {stats ? (
+              <strong>{stats.products.toLocaleString()} products</strong>
+            ) : (
+              <span className="about-story__inline-skeleton" aria-hidden />
+            )}{" "}
+            and{" "}
+            {stats ? (
+              <strong>{stats.customers.toLocaleString()} customers</strong>
+            ) : (
+              <span className="about-story__inline-skeleton" aria-hidden />
+            )}{" "}
+            served, we're here to guide you every step of the way — whether
+            you're upgrading your kitchen, refreshing your living room, or
+            outfitting a new home.
           </p>
         </div>
 
         <div>
           <span className="about-eyebrow">Our Journey</span>
           <h2 className="about-section-title">How We Got Here</h2>
-          <div className="about-timeline">
-            {TIMELINE.map((item) => (
-              <div key={item.year} className="about-timeline__item">
-                <div className="about-timeline__dot">{item.icon}</div>
+          <div className={`about-timeline${isLoading ? " about-timeline--loading" : ""}`}>
+            {(timeline ?? TIMELINE_SKELETON).map((item, i) => (
+              <div key={`${"year" in item ? item.year : i}-${i}`} className="about-timeline__item">
+                <div className="about-timeline__dot">
+                  {"icon" in item && item.icon ? item.icon : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <circle cx="12" cy="12" r="4" />
+                    </svg>
+                  )}
+                </div>
                 <div className="about-timeline__body">
                   <p className="about-timeline__year">{item.year}</p>
                   <h3 className="about-timeline__title">{item.title}</h3>
-                  <p className="about-timeline__desc">{item.desc}</p>
+                  {item.desc && <p className="about-timeline__desc">{item.desc}</p>}
                 </div>
               </div>
             ))}
@@ -278,7 +364,7 @@ function AboutPage() {
         </div>
         <div className="about-team__grid">
           {TEAM.map((m) => (
-            <div key={m.name} className="about-team-card">
+            <div key={m.name} className={`about-team-card${m.highlight ? " about-team-card--highlight" : ""}`}>
               <div className="about-team-card__avatar-wrap">
                 <div className="about-team-card__avatar-ring" aria-hidden />
                 <div className="about-team-card__avatar">{m.initial}</div>
@@ -298,7 +384,8 @@ function AboutPage() {
           <span className="about-cta__eyebrow">Ready to get started?</span>
           <h2 className="about-cta__title">Find Your Next Appliance Today</h2>
           <p className="about-cta__sub">
-            Browse thousands of products across 8 categories — all in one place,
+            Browse {stats ? stats.products.toLocaleString() : "thousands of"} products
+            across {stats ? stats.categories : ""} {stats?.categories === 1 ? "category" : "categories"} — all in one place,
             with fast delivery and easy returns.
           </p>
           <div className="about-cta__actions">

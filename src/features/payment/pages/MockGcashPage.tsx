@@ -1,5 +1,10 @@
-import { useMemo, useState } from "react";
-import { submitCheckout, type CheckoutPayload, type PlacedOrder } from "@/shared/lib/checkoutApi";
+import { useEffect, useMemo, useState } from "react";
+import {
+  sendMockGcashReceiptEmail,
+  submitCheckout,
+  type CheckoutPayload,
+  type PlacedOrder,
+} from "@/shared/lib/checkoutApi";
 import "@/shared/styles/MockGcash.css";
 
 type GatewayStep = "phone" | "otp" | "pin" | "confirm" | "receipt";
@@ -34,11 +39,15 @@ function readSession(sessionId: string): MockGcashSession | null {
 }
 
 function generateMockOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  const values = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(values);
+  return String(100000 + (values[0] % 900000));
 }
 
 function generateReceiptRef() {
-  return `GC${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+  const values = new Uint32Array(2);
+  globalThis.crypto.getRandomValues(values);
+  return `GC${values[0].toString().padStart(10, "0")}${String(values[1]).slice(0, 4)}`;
 }
 
 export default function MockGcashPage() {
@@ -53,7 +62,30 @@ export default function MockGcashPage() {
   const [submitting, setSubmitting] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [receiptRef, setReceiptRef] = useState("");
+  const [paidAt, setPaidAt] = useState<Date | null>(null);
+  const [closeCountdown, setCloseCountdown] = useState(10);
+  const [emailStatus, setEmailStatus] = useState("");
   const generatedAt = useMemo(() => new Date(), []);
+
+  const normalizedPhone = phone.replace(/\D/g, "");
+
+  useEffect(() => {
+    if (step !== "receipt") return;
+
+    const timer = window.setInterval(() => {
+      setCloseCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          window.close();
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [step]);
 
   if (!session) {
     return (
@@ -67,7 +99,7 @@ export default function MockGcashPage() {
     );
   }
 
-  const normalizedPhone = phone.replace(/\D/g, "");
+  const pendingOrderRef = `PENDING-${session.sessionId.slice(0, 8).toUpperCase()}`;
 
   const handleSendOtp = () => {
     if (!/^09\d{9}$/.test(normalizedPhone)) {
@@ -110,14 +142,25 @@ export default function MockGcashPage() {
         fulfillment: session.fulfillment,
         paymentMethod: "GCash",
       });
+      const nextReceiptRef = generateReceiptRef();
+      const nextPaidAt = new Date();
 
       setPlacedOrder(order);
-      setReceiptRef(generateReceiptRef());
+      setReceiptRef(nextReceiptRef);
+      setPaidAt(nextPaidAt);
+      setCloseCountdown(10);
       localStorage.removeItem(`appliansys:mock-gcash:${session.sessionId}`);
       localStorage.setItem(
         "appliansys:checkout-completed",
-        JSON.stringify({ orderId: order.orderId, sessionId: session.sessionId, at: Date.now() }),
+        JSON.stringify({ orderId: order.orderId, sessionId: session.sessionId, at: nextPaidAt.getTime() }),
       );
+      void sendMockGcashReceiptEmail({
+        orderId: order.orderId,
+        paidAt: nextPaidAt.toISOString(),
+        receiptNumber: nextReceiptRef,
+      })
+        .then((result) => setEmailStatus(result.message))
+        .catch(() => setEmailStatus("Mock confirmation email could not be sent, but payment succeeded."));
       setStep("receipt");
     } catch (paymentError) {
       setError(paymentError instanceof Error ? paymentError.message : "Mock payment failed.");
@@ -199,6 +242,7 @@ export default function MockGcashPage() {
               <div><dt>Amount to be paid</dt><dd>{formatCurrency(session.total)}</dd></div>
               <div><dt>Date</dt><dd>{generatedAt.toLocaleDateString("en-PH", { dateStyle: "long" })}</dd></div>
               <div><dt>Time</dt><dd>{generatedAt.toLocaleTimeString("en-PH", { timeStyle: "short" })}</dd></div>
+              <div><dt>Order reference</dt><dd>{pendingOrderRef}</dd></div>
             </dl>
             {error ? <div className="mock-gcash-error">{error}</div> : null}
             <button type="button" onClick={() => void handlePay()} disabled={submitting}>
@@ -217,7 +261,15 @@ export default function MockGcashPage() {
               <div><dt>Order Ref.</dt><dd>{placedOrder.orderRef}</dd></div>
               <div><dt>Amount Paid</dt><dd>{formatCurrency(placedOrder.totalAmount)}</dd></div>
               <div><dt>Payment Method</dt><dd>Mock GCash</dd></div>
+              <div>
+                <dt>Date and Time Paid</dt>
+                <dd>{(paidAt ?? new Date()).toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}</dd>
+              </div>
             </dl>
+            {emailStatus ? <div className="mock-gcash-email-status">{emailStatus}</div> : null}
+            <div className="mock-gcash-countdown">
+              This tab will automatically close in {closeCountdown} seconds.
+            </div>
           </div>
         ) : null}
       </section>

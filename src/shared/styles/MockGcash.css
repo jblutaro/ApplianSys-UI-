@@ -146,6 +146,24 @@
   text-align: center;
 }
 
+.mock-gcash-email-status {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #eef7ff;
+  color: #0958c9;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mock-gcash-countdown {
+  padding: 14px;
+  border-radius: 12px;
+  background: #f1f6ff;
+  color: #0054dc;
+  font-size: 15px;
+  font-weight: 900;
+}
+
 .mock-gcash-check {
   width: 68px;
   height: 68px;

@@ -56,3 +56,19 @@ export async function fetchCheckoutSettings(): Promise<CheckoutSettings> {
   const data = await requestJson<{ ok: true; checkout: CheckoutSettings }>("/api/checkout/settings");
   return data.checkout;
 }
+
+export async function sendMockGcashReceiptEmail(payload: {
+  orderId: number;
+  paidAt: string;
+  receiptNumber: string;
+}) {
+  return requestJson<{
+    ok: true;
+    delivered: boolean;
+    message: string;
+    mode: string;
+  }>("/api/checkout/mock-gcash/email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

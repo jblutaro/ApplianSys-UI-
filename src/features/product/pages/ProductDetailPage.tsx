@@ -5,7 +5,8 @@ import {
   type CatalogProduct,
 } from "@/features/category/lib/catalogApi";
 import { useAuthUser } from "@/app/hooks/useAuthUser";
-import { addToCart } from "@/shared/lib/cartApi";
+import { addToCart, type CartItem } from "@/shared/lib/cartApi";
+import { CheckoutModal } from "@/shared/components/CheckoutModal";
 import "@/shared/styles/Product.css";
 
 function slugify(value: string) {
@@ -42,20 +43,6 @@ function parseSpecs(description: string): { key: string; value: string }[] {
     .filter((r): r is { key: string; value: string } => r !== null);
 }
 
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="pdp-stars" aria-label={`${rating} out of 5 stars`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <svg key={n} width="14" height="14" viewBox="0 0 24 24"
-          fill={n <= Math.round(rating) ? "currentColor" : "none"}
-          stroke="currentColor" strokeWidth="2" aria-hidden>
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ))}
-    </div>
-  );
-}
-
 function SkeletonLoader() {
   return (
     <div className="pdp-skeleton">
@@ -89,6 +76,8 @@ function ProductDetailPage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("description");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [buyNowItems, setBuyNowItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,8 +137,31 @@ function ProductDetailPage() {
     }
   };
 
-  const handleCopyLink = () => {
-    void navigator.clipboard.writeText(window.location.href);
+  const handleBuyNow = async () => {
+    if (!user) { void navigate("/cart"); return; }
+    if (!product || isOutOfStock) return;
+    // Add to cart so the order is backed by a real cart entry, then open checkout
+    // with just this product so the user skips the cart page entirely.
+    try {
+      await addToCart(product.dbId, quantity);
+    } catch {
+      // Non-fatal — proceed to checkout even if the cart API call fails
+      // (the checkout endpoint reads from the server cart, so a prior entry may exist)
+    }
+    const item: CartItem = {
+      productId: product.dbId,
+      productName: product.name,
+      imageUrl: product.image ?? "",
+      price: product.price,
+      quantity,
+      stock: product.stock,
+      status: product.status ?? "In Stock",
+    };
+    setBuyNowItems([item]);
+    setCheckoutOpen(true);
+  };
+
+  const handleCopyLink = () => {    void navigator.clipboard.writeText(window.location.href);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
   };
@@ -271,18 +283,9 @@ function ProductDetailPage() {
           {/* Name */}
           <h1 className="pdp-info__name">{product.name}</h1>
 
-          {/* Rating row */}
-          <div className="pdp-info__rating-row">
-            <StarRating rating={4} />
-            <span className="pdp-info__rating-count">4.0 · 128 reviews</span>
-          </div>
-
           {/* Price block */}
           <div className="pdp-info__price-block">
             <span className="pdp-info__price">{formatCurrency(product.price)}</span>
-            <span className="pdp-info__price-note">
-              Inclusive of all taxes<br />Free shipping on orders over ₱2,000
-            </span>
           </div>
 
           {/* Stock */}
@@ -323,7 +326,7 @@ function ProductDetailPage() {
             </button>
             {cartState === "error" && <p className="pdp-cta__error">{cartError}</p>}
             <button type="button" className="pdp-cta__buy-now"
-              disabled={isOutOfStock} onClick={() => void navigate("/cart")}>
+              disabled={isOutOfStock} onClick={() => void handleBuyNow()}>
               Buy Now
             </button>
           </div>
@@ -511,6 +514,18 @@ function ProductDetailPage() {
           <img className="pdp-lightbox__img" src={product.image} alt={product.name} onClick={(e) => e.stopPropagation()} />
           <button type="button" className="pdp-lightbox__close" onClick={() => setLightboxOpen(false)} aria-label="Close image">✕</button>
         </div>
+      )}
+
+      {/* Buy Now — inline checkout modal */}
+      {checkoutOpen && (
+        <CheckoutModal
+          items={buyNowItems}
+          onClose={() => setCheckoutOpen(false)}
+          onSuccess={() => {
+            setCheckoutOpen(false);
+            setBuyNowItems([]);
+          }}
+        />
       )}
 
     </div>

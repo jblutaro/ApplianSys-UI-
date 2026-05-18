@@ -140,9 +140,6 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
             <div className="admin-brand__row">
               <h1 className="admin-brand__title">ApplianSys Panel</h1>
             </div>
-            <span className="admin-brand__text">
-              Control the storefront, orders, products, and account tools.
-            </span>
           </div>
 
           <nav className="admin-sidebar__nav">

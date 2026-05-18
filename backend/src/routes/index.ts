@@ -8,6 +8,7 @@ import { checkoutRouter } from "./checkout.js";
 import { chatRouter } from "./chat.js";
 import { ordersRouter } from "./orders.js";
 import { productsRouter } from "./products.js";
+import { statsRouter } from "./stats.js";
 
 export const apiRouter = Router();
 
@@ -33,6 +34,7 @@ apiRouter.get("/db-test", async (_req, res, next) => {
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/chat", chatRouter);
 apiRouter.use(productsRouter);
+apiRouter.use(statsRouter);
 apiRouter.use("/cart", requireAuthenticated, cartRouter);
 apiRouter.use("/checkout", requireAuthenticated, checkoutRouter);
 apiRouter.use("/orders", requireAuthenticated, ordersRouter);

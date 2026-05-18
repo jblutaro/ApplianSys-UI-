@@ -15,6 +15,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const isStandaloneRoute = isAdminRoute || location.pathname.startsWith("/mock-gcash-payment");
 
   const handleAuthenticated = (authenticatedUser: AppUser | null) => {
     if (authenticatedUser?.role === "admin") {
@@ -24,7 +25,7 @@ function App() {
 
   return (
     <div>
-      {!isAdminRoute ? (
+      {!isStandaloneRoute ? (
         <AppHeader
           onAuthOpen={() => setAuthOpen(true)}
           onSignOut={signOutUser}
@@ -36,7 +37,7 @@ function App() {
         <AppRoutes user={user} onAuthOpen={() => setAuthOpen(true)} />
       </main>
 
-      {!isAdminRoute ? <ChatGPTBot /> : null}
+      {!isStandaloneRoute ? <ChatGPTBot /> : null}
 
       <AuthModal
         open={authOpen}
