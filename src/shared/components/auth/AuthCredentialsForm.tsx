@@ -65,11 +65,10 @@ export function AuthCredentialsForm({
         {mode === "login" ? "Log in" : "Sign up"}
       </h2>
 
-      <p className="auth-modal__hint">
-        Local accounts are now managed directly by the ApplianSys backend.
-      </p>
-
-      <form className="auth-modal__form" onSubmit={(event) => void onSubmit(event)}>
+      <form
+        className="auth-modal__form"
+        onSubmit={(event) => void onSubmit(event)}
+      >
         {mode === "signup" ? (
           <div className="auth-modal__grid">
             <div>
@@ -120,7 +119,10 @@ export function AuthCredentialsForm({
               </div>
             </div>
             <div>
-              <label className="auth-modal__label" htmlFor="auth-contact-number">
+              <label
+                className="auth-modal__label"
+                htmlFor="auth-contact-number"
+              >
                 Contact number
               </label>
               <div className="auth-modal__field-wrap">
@@ -161,7 +163,9 @@ export function AuthCredentialsForm({
             id="auth-password"
             className="auth-modal__input auth-modal__input--with-toggle"
             type={showPassword ? "text" : "password"}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
             placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

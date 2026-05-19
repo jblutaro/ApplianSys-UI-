@@ -1,72 +1,87 @@
 # ApplianSys
 
-ApplianSys is a full-stack appliance e-commerce storefront. The frontend is a React + Vite SPA; the backend is an Express + TypeScript API backed by MySQL.
+ApplianSys is a full-stack appliance e-commerce system. The frontend is a React + Vite single-page app, and the backend is an Express + TypeScript REST API backed by MySQL.
 
 ## Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Frontend | React 19, TypeScript, Vite 7 (SWC) |
 | Routing | React Router v7 |
-| UI library | MUI v7 + Emotion |
-| Styling | Custom CSS (CSS variables), Tailwind v4 (installed) |
-| State | Redux Toolkit + React Redux |
+| UI | MUI v7, Emotion, MUI icons |
+| Styling | Custom CSS with CSS variables; Tailwind v4 is installed |
+| State | Redux Toolkit and React Redux |
 | Backend | Express 4, TypeScript, tsx |
 | Database | MySQL via mysql2 |
-| Auth | Session-cookie auth (in-memory, server-side) |
-| Chat | OpenAI chat completions via backend proxy |
+| Auth | HttpOnly session-cookie auth with in-memory sessions |
+| Chat | OpenAI chat completions through the backend, with a fallback response |
 
 ## Project Layout
 
-```
+```text
 ApplianSys/
-├── src/                    Frontend application
-│   ├── app/                Shell, routes, providers, store
-│   ├── features/           Route-level features
-│   │   ├── about/
-│   │   ├── admin/
-│   │   ├── cart/
-│   │   ├── category/
-│   │   ├── orders/
-│   │   ├── product/        Product detail page
-│   │   ├── search/         Home / category browse
-│   │   └── settings/
-│   ├── shared/             Cross-feature components, hooks, lib, styles
-│   └── theme/              MUI theme
-├── backend/                Express API
-│   └── src/
-│       ├── auth/           Session, password, user helpers, middleware
-│       ├── config/         env.ts, database.ts
-│       ├── data/           admin-settings.json (file-backed settings)
-│       ├── routes/         Express routers
-│       ├── scripts/        One-off migration and seed scripts
-│       └── services/       Business logic (admin/, auth/, cart/, chat/)
-├── database/               SQL schema (appliansysdb.sql)
-├── public/                 Static assets served by Vite
-├── .env.example            Root env template (frontend + Vite proxy)
-└── backend/.env.example    Backend env template (DB, OpenAI, port)
+|-- src/                         Frontend application
+|   |-- app/                     App shell, routes, providers, store
+|   |-- features/                Route-level features
+|   |   |-- about/
+|   |   |-- admin/
+|   |   |-- cart/
+|   |   |-- category/
+|   |   |-- orders/
+|   |   |-- payment/
+|   |   |-- product/
+|   |   |-- search/
+|   |   `-- settings/
+|   |-- shared/                  Cross-feature components, hooks, API clients, styles
+|   `-- theme/                   MUI theme
+|-- backend/                     Express API
+|   |-- data/                    File-backed admin settings
+|   `-- src/
+|       |-- auth/                Sessions, password hashing, user helpers, middleware
+|       |-- config/              Environment and database configuration
+|       |-- routes/              Express routers
+|       |-- scripts/             Seed and migration utilities
+|       `-- services/            Business logic
+|-- database/                    MySQL schema: appliansysdb.sql
+|-- public/                      Static Vite assets
+|-- scripts/dev.mjs              Starts backend, then frontend
+|-- DOCUMENTATION.md             Detailed architecture and API reference
+`-- changelog.md                 Project change history
 ```
+
+## Features
+
+- Public storefront with home/search, category browse, product detail, and about pages.
+- Customer auth with registration, login, account profile, password changes, and session persistence through cookies.
+- Customer cart backed by database tables, including quantity updates, remove actions, and stock warnings.
+- Checkout for delivery or pickup, with Albay delivery validation and mock GCash payment flow.
+- Customer order history with cancellation support.
+- Admin/staff panel for dashboard metrics, product and category management, orders, pickup releases, platform settings, and reports.
+- Floating chatbot that calls the backend OpenAI proxy and falls back gracefully when OpenAI is unavailable.
 
 ## Environment Files
 
-Two separate `.env` files are required.
+Create two local environment files. Do not commit real credentials.
 
-### Root `.env` (frontend / Vite)
+### Root `.env`
+
+Used by Vite and browser-exposed variables:
 
 ```bash
 copy .env.example .env
 ```
 
 ```env
-VITE_ADMIN_EMAILS=admin@example.com
+VITE_ADMIN_EMAILS=admin@appliansys.com
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000
 ```
 
-- `VITE_ADMIN_EMAILS` — comma-separated list of emails granted admin access.
-- `VITE_API_PROXY_TARGET` — backend URL that Vite proxies `/api` requests to in dev.
-- Restart Vite after editing.
+- `VITE_ADMIN_EMAILS` is a comma-separated list of emails granted admin access by the frontend guard.
+- `VITE_API_PROXY_TARGET` is the Express backend URL used by the Vite dev proxy.
 
-### `backend/.env` (server / database)
+### `backend/.env`
+
+Used only by the Express server:
 
 ```bash
 copy backend\.env.example backend\.env
@@ -77,35 +92,36 @@ PORT=4000
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_NAME=appliansys_db
-DB_USER=your-db-user
-DB_PASSWORD=your-db-password
+DB_USER=root
+DB_PASSWORD=
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-- Never commit real credentials. Keep `backend/.env` local only.
+The backend also reads `ADMIN_EMAILS` if present, and falls back to `VITE_ADMIN_EMAILS`.
 
 ## Setup
 
 ```bash
-# 1. Install frontend dependencies
+# Install frontend dependencies
 npm install
 
-# 2. Install backend dependencies
+# Install backend dependencies
 npm run install:backend
 
-# 3. Create env files
+# Create local env files
 copy .env.example .env
 copy backend\.env.example backend\.env
 
-# 4. Import the database schema
-#    Open MySQL and run: database/appliansysdb.sql
+# Import database/appliansysdb.sql into MySQL
 ```
+
+The default database name is `appliansys_db`, matching the included schema and backend defaults.
 
 ## Running
 
 ```bash
-# Both services together
+# Start backend first, then Vite
 npm run dev
 
 # Frontend only
@@ -115,98 +131,131 @@ npm run start
 npm run start:backend
 ```
 
+Useful URLs:
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` or the port Vite prints |
+| Backend health | `http://127.0.0.1:4000/api/health` |
+| DB test | `http://127.0.0.1:4000/api/db-test` |
+
 ## Scripts
 
 | Command | Description |
-|---|---|
-| `npm run dev` | Start frontend + backend together |
-| `npm run start` | Start Vite dev server only |
-| `npm run start:backend` | Start Express backend only |
-| `npm run install:backend` | Install backend npm dependencies |
-| `npm run build` | TypeScript check + Vite production build |
+| --- | --- |
+| `npm run dev` | Start backend and frontend together |
+| `npm run start` | Start Vite only |
+| `npm run start:frontend` | Start Vite only |
+| `npm run start:backend` | Start the backend dev server |
+| `npm run install:backend` | Install backend dependencies |
+| `npm run build` | Type-check and build the frontend |
 | `npm run lint` | Run ESLint |
 | `npm run format` | Run Prettier |
 | `npm run preview` | Preview the production build |
-| `npm --prefix backend run hash:password -- <pw>` | Hash a password with scrypt |
-| `npm --prefix backend run migrate:passwords` | Upgrade plain-text passwords to hashed |
-| `npm --prefix backend run migrate:account-ids` | Backfill ULID account IDs |
+| `npm --prefix backend run build` | Compile the backend |
+| `npm --prefix backend run seed` | Run backend seed script |
+| `npm --prefix backend run hash:password -- <password>` | Hash a password for manual DB insertion |
+| `npm --prefix backend run migrate:passwords` | Upgrade legacy plain-text passwords |
+| `npm --prefix backend run migrate:account-ids` | Backfill public account IDs |
 
-## API Endpoints
+## Frontend Routes
+
+| Path | Page |
+| --- | --- |
+| `/` | Search/home page |
+| `/about` | About page |
+| `/category/:categorySlug` | Category browse |
+| `/category/:categorySlug/:subSlug` | Subcategory browse |
+| `/category/:categorySlug/:subSlug/:subSubSlug` | Sub-subcategory browse |
+| `/product/:productId` | Product detail |
+| `/cart` | Customer cart |
+| `/orders` | Customer orders |
+| `/settings` | Customer settings |
+| `/admin` | Admin/staff panel |
+| `/mock-gcash-payment` | Mock GCash payment screen |
+
+## API Overview
+
+All API routes are mounted under `/api`.
 
 ### Public
 
 | Method | Path | Description |
-|---|---|---|
-| GET | `/api/health` | Service health check |
-| GET | `/api/db-test` | Database connectivity check |
-| GET | `/api/products` | List all products (catalog) |
-| GET | `/api/categories` | List all categories with subcategories |
-| POST | `/api/chat` | Chatbot — proxies to OpenAI |
+| --- | --- | --- |
+| GET | `/health` | Service health check |
+| GET | `/db-test` | Database connectivity check |
+| GET | `/products` | Product catalog |
+| GET | `/categories` | Category tree |
+| GET | `/stats` | Site/catalog summary stats |
+| GET | `/best-selling` | Best-selling products |
+| POST | `/chat` | Chat completions proxy |
 
-### Auth (`/api/auth`)
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/auth/me` | Current session user |
-| POST | `/api/auth/login` | Sign in |
-| POST | `/api/auth/register` | Register new customer account |
-| POST | `/api/auth/logout` | Sign out |
-| GET | `/api/auth/account` | Get account profile |
-| PUT | `/api/auth/account` | Update account profile |
-| PUT | `/api/auth/password` | Change password |
-
-### Cart (`/api/cart`) — requires customer session
+### Auth
 
 | Method | Path | Description |
-|---|---|---|
-| GET | `/api/cart` | Get current user's cart items |
-| POST | `/api/cart/items` | Add item (or increase quantity) |
-| PATCH | `/api/cart/items/:productId` | Set exact quantity (0 = remove) |
-| DELETE | `/api/cart/items/:productId` | Remove item |
+| --- | --- | --- |
+| GET | `/auth/me` | Current session user |
+| POST | `/auth/login` | Sign in |
+| POST | `/auth/register` | Register a customer |
+| POST | `/auth/logout` | Sign out |
+| GET | `/auth/account` | Read account profile |
+| PUT | `/auth/account` | Update account profile |
+| PUT | `/auth/password` | Change password |
 
-### Admin (`/api/admin`) — requires admin or staff session
+### Customer
 
 | Method | Path | Description |
-|---|---|---|
-| GET | `/api/admin/dashboard` | Dashboard metrics, products, orders, revenue |
-| GET | `/api/admin/products` | Product list |
-| POST | `/api/admin/products` | Create product |
-| PUT | `/api/admin/products/:id` | Update product |
-| DELETE | `/api/admin/products/:id` | Delete product |
-| GET | `/api/admin/categories` | Category tree |
-| POST | `/api/admin/categories` | Create category + subcategory |
-| POST | `/api/admin/subcategories/:id/sub-subcategories` | Add sub-subcategory |
-| DELETE | `/api/admin/subcategories/:id` | Delete subcategory |
-| DELETE | `/api/admin/sub-subcategories/:id` | Delete sub-subcategory |
-| GET | `/api/admin/orders` | Order list |
-| PATCH | `/api/admin/orders/:id/status` | Update order status |
-| GET | `/api/admin/settings` | Platform settings |
-| PUT | `/api/admin/settings` | Update platform settings |
-| GET | `/api/admin/reports/sales` | Sales report |
+| --- | --- | --- |
+| GET | `/cart` | Get current user's cart |
+| POST | `/cart/items` | Add or increase a cart item |
+| PATCH | `/cart/items/:productId` | Set item quantity; `0` removes |
+| DELETE | `/cart/items/:productId` | Remove item |
+| POST | `/checkout` | Place a delivery or pickup order |
+| GET | `/checkout/settings` | Checkout settings and shop location |
+| POST | `/checkout/mock-gcash/email` | Log a mock GCash confirmation email |
+| GET | `/orders` | Customer order history |
+| POST | `/orders/:orderId/cancel` | Cancel a customer order |
+
+Customer routes require a signed-in customer. Admin and staff users are rejected from customer-only routes.
+
+### Admin
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/admin/dashboard?period=weekly|monthly|yearly` | Dashboard metrics |
+| GET | `/admin/products` | Product list |
+| POST | `/admin/products` | Create product |
+| PUT | `/admin/products/:productId` | Update product |
+| DELETE | `/admin/products/:productId` | Delete product |
+| GET | `/admin/categories` | Category tree |
+| POST | `/admin/categories` | Create category and subcategory |
+| DELETE | `/admin/categories/:categoryId` | Delete category |
+| POST | `/admin/subcategories/:subcategoryId/sub-subcategories` | Create sub-subcategory |
+| DELETE | `/admin/subcategories/:subcategoryId` | Delete subcategory |
+| DELETE | `/admin/sub-subcategories/:subSubcategoryId` | Delete sub-subcategory |
+| GET | `/admin/orders` | Admin order list |
+| PATCH | `/admin/orders/:orderId/status` | Update order status |
+| GET | `/admin/pickup-releases` | Pending pickup release orders |
+| POST | `/admin/pickup-releases/:orderId/release` | Release pickup order |
+| GET | `/admin/settings` | Platform settings |
+| PUT | `/admin/settings` | Update platform settings |
+| GET | `/admin/reports/sales?period=...` | Sales report |
+
+Admin routes require an admin or staff session. Some category-management actions are admin-only.
 
 ## Auth and Roles
 
-- Authentication uses an in-memory session cookie (`appliansys_session`, 7-day TTL).
+- Sessions use the `appliansys_session` HttpOnly cookie with a 7-day TTL.
+- Sessions are stored in memory, so they are cleared when the backend restarts.
 - Passwords are hashed with Node's built-in `scrypt`.
-- Three roles: `customer`, `staff`, `admin`.
-- Admin access is granted by `user_type = 'admin'` in the DB, or by matching `VITE_ADMIN_EMAILS`, or by an `admin*` email prefix.
-- Admin and staff accounts cannot use the cart, orders, or customer settings pages.
-- Default seeded password: `ApplianSys123!`
+- Legacy plain-text passwords are upgraded after successful login.
+- Roles are `customer`, `staff`, and `admin`.
+- Default seeded password: `ApplianSys123!`.
 
-## Common Checks
+## Security Notes
 
-```
-Frontend:   http://localhost:5173  (or the port Vite prints)
-Backend:    http://127.0.0.1:4000/api/health
-DB test:    http://127.0.0.1:4000/api/db-test
-```
+- Keep `.env` and `backend/.env` local.
+- Put OpenAI and database credentials only in `backend/.env`.
+- Root `VITE_*` variables are exposed to the browser bundle, so they must not contain secrets.
 
-If the backend is unreachable, admin and cart requests fail with `ECONNREFUSED 127.0.0.1:4000`.
-
-## Security
-
-- Keep `.env` and `backend/.env` local. Never commit real credentials.
-- Use placeholder values in docs, examples, and pull requests.
-- `OPENAI_API_KEY` must stay in `backend/.env` only.
-
-See `DOCUMENTATION.md` for full architecture details.
+See `DOCUMENTATION.md` for architecture details and a fuller API reference.
