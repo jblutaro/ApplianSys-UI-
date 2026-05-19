@@ -20,3 +20,10 @@ export async function fetchOrders(): Promise<CustomerOrder[]> {
   const data = await requestJson<{ ok: true; orders: CustomerOrder[] }>("/api/orders");
   return data.orders;
 }
+
+export async function cancelOrder(orderId: number): Promise<CustomerOrder[]> {
+  const data = await requestJson<{ ok: true; orders: CustomerOrder[] }>(`/api/orders/${orderId}/cancel`, {
+    method: "POST",
+  });
+  return data.orders;
+}

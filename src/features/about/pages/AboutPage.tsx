@@ -239,33 +239,6 @@ function AboutPage() {
               <span className="about-hero__center-year">2020</span>
               <span className="about-hero__center-label">Est.</span>
             </div>
-
-            {/* Floating mini-cards */}
-            <div className="about-hero__float">
-              <div className="about-hero__float-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                </svg>
-              </div>
-              <div className="about-hero__float-text">
-                <strong>{formatCount(stats?.customers)}</strong>
-                <span>Happy Customers</span>
-              </div>
-            </div>
-
-            <div className="about-hero__float">
-              <div className="about-hero__float-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <path d="M8 21h8M12 17v4" />
-                </svg>
-              </div>
-              <div className="about-hero__float-text">
-                <strong>{formatCount(stats?.products)}</strong>
-                <span>Products Listed</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -322,7 +295,7 @@ function AboutPage() {
             {(timeline ?? TIMELINE_SKELETON).map((item, i) => (
               <div key={`${"year" in item ? item.year : i}-${i}`} className="about-timeline__item">
                 <div className="about-timeline__dot">
-                  {"icon" in item && item.icon ? item.icon : (
+                  {("icon" in item && item.icon) ? item.icon as React.ReactNode : (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                       <circle cx="12" cy="12" r="4" />
                     </svg>

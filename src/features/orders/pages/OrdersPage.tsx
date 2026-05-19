@@ -2,25 +2,55 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAdminUser } from "@/features/admin";
 import type { AppUser } from "@/shared/lib/auth";
-import { fetchOrders, type CustomerOrder } from "@/shared/lib/ordersApi";
+import { cancelOrder, fetchOrders, type CustomerOrder } from "@/shared/lib/ordersApi";
 import "@/shared/styles/Orders.css";
 
-type Tab = "all" | "pending" | "shipped" | "delivered";
+type FulfillmentFilter = "all" | "delivery" | "pickup";
+type StatusFilter = "all" | "pending" | "shipping" | "shipped" | "delivered" | "preparing" | "ready_for_pickup";
 
-const TABS: { key: Tab; label: string }[] = [
+const FULFILLMENT_FILTERS: { key: FulfillmentFilter; label: string }[] = [
   { key: "all", label: "All orders" },
+  { key: "delivery", label: "Delivery Orders" },
+  { key: "pickup", label: "Pick-up Orders" },
+];
+
+const DELIVERY_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All delivery" },
   { key: "pending", label: "Pending" },
-  { key: "shipped", label: "Shipped" },
+  { key: "shipping", label: "Shipping" },
   { key: "delivered", label: "Delivered" },
+];
+
+const PICKUP_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All pick-up" },
+  { key: "pending", label: "Pending" },
+  { key: "preparing", label: "Preparing" },
+  { key: "ready_for_pickup", label: "Ready" },
 ];
 
 // Status badge color
 const STATUS_COLOR: Record<string, string> = {
+  cancelled: "#6b7280",
+  Cancelled: "#6b7280",
+  delivered: "#27ae60",
   Pending: "#e67e22",
+  pending: "#e67e22",
   Processing: "#8c6500",
+  processing: "#8c6500",
   Shipped: "#2980b9",
+  shipped: "#2980b9",
   Delivered: "#27ae60",
 };
+
+function formatStatusLabel(value: string) {
+  if (value === "ready_for_pickup") return "Ready for Pickup";
+
+  return value
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
 
 type OrdersPageProps = {
   onAuthOpen: () => void;
@@ -28,10 +58,12 @@ type OrdersPageProps = {
 };
 
 function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("all");
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -88,31 +120,71 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
   }
 
   const filtered = orders.filter((o) => {
-    const matchTab =
-      activeTab === "all" || o.status.toLowerCase() === activeTab;
+    const normalizedStatus = o.status.toLowerCase().replace(/\s+/g, "_");
+    const matchesFulfillment =
+      fulfillmentFilter === "all" || o.deliveryMethod === fulfillmentFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      normalizedStatus === statusFilter ||
+      (statusFilter === "shipping" && normalizedStatus === "shipped");
     const matchSearch =
       search.trim() === "" ||
       o.id.toLowerCase().includes(search.toLowerCase()) ||
       o.items.some((i) => i.name.toLowerCase().includes(search.toLowerCase()));
-    return matchTab && matchSearch;
+    return matchesFulfillment && matchesStatus && matchSearch;
   });
+
+  const handleCancelOrder = (order: CustomerOrder) => {
+    void (async () => {
+      setCancellingOrderId(order.dbId);
+      setErrorMessage("");
+
+      try {
+        setOrders(await cancelOrder(order.dbId));
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to cancel order.");
+      } finally {
+        setCancellingOrderId(null);
+      }
+    })();
+  };
 
   return (
     <div className="orders-page">
       <h1 className="orders-page__title">My Orders</h1>
 
       <div className="orders-toolbar">
-        <div className="orders-tabs">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              className={`orders-tab${activeTab === t.key ? " orders-tab--active" : ""}`}
-              onClick={() => setActiveTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="orders-filter-groups">
+          <div className="orders-tabs" aria-label="Order type filters">
+            {FULFILLMENT_FILTERS.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                className={`orders-tab${fulfillmentFilter === filter.key ? " orders-tab--active" : ""}`}
+                onClick={() => {
+                  setFulfillmentFilter(filter.key);
+                  setStatusFilter("all");
+                }}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          {fulfillmentFilter !== "all" ? (
+            <div className="orders-tabs" aria-label="Order status filters">
+              {(fulfillmentFilter === "delivery" ? DELIVERY_STATUS_FILTERS : PICKUP_STATUS_FILTERS).map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  className={`orders-tab${statusFilter === filter.key ? " orders-tab--active" : ""}`}
+                  onClick={() => setStatusFilter(filter.key)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="orders-search-wrap">
@@ -149,12 +221,17 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
       ) : (
         <div className="orders-list">
           {filtered.map((order) => (
+            (() => {
+              const normalizedStatus = order.status.toLowerCase().replace(/\s+/g, "_");
+              const canCancel = !["cancelled", "delivered", "released"].includes(normalizedStatus);
+
+              return (
               <div key={order.id} className="order-card">
                 <div className="order-card__header">
                   <span className="order-card__id">Order #{order.id}</span>
                   <span className="order-card__date">Placed on: {order.date}</span>
                   <span className="order-card__status" style={{ color: STATUS_COLOR[order.status] }}>
-                    Status: <strong>{order.status}</strong>
+                    Status: <strong>{formatStatusLabel(order.status)}</strong>
                   </span>
                   <span className="order-card__date">
                     {order.deliveryMethod === "pickup" ? "Store pickup" : "Home delivery"}
@@ -192,9 +269,21 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                     <button type="button" className="order-card__btn order-card__btn--outline">
                       Check Order Status
                     </button>
+                    {canCancel ? (
+                      <button
+                        type="button"
+                        className="order-card__btn order-card__btn--danger"
+                        disabled={cancellingOrderId === order.dbId}
+                        onClick={() => handleCancelOrder(order)}
+                      >
+                        {cancellingOrderId === order.dbId ? "Cancelling..." : "Cancel Order"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
+              );
+            })()
           ))}
         </div>
       )}

@@ -142,6 +142,24 @@ export async function findUserById(userId: number): Promise<AuthUserRow | null> 
   return rows[0] ?? null;
 }
 
+export async function listStaffAndAdminUsers() {
+  const [rows] = await dbPool.query<AuthUserProfileRow[]>(
+    `SELECT user_id, account_id, fname, mname, lname, email, contact_num, status, created_at, last_login, user_type
+     FROM \`USER\`
+     WHERE COALESCE(status, 'Active') = 'Active'
+     ORDER BY fname ASC, lname ASC, email ASC`,
+  );
+
+  return rows
+    .filter((user) => isStaffOrAdminUser(user))
+    .map((user) => ({
+      displayName: buildDisplayName(user),
+      email: user.email,
+      id: user.user_id,
+      role: mapRole(user),
+    }));
+}
+
 export async function findUserProfileById(userId: number): Promise<AuthUserProfileRow | null> {
   const [rows] = await dbPool.query<AuthUserProfileRow[]>(
     `SELECT user_id, account_id, fname, mname, lname, email, contact_num, status, created_at, last_login, user_type

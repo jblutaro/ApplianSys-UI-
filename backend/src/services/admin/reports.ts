@@ -22,7 +22,10 @@ async function getLatestOrderYear() {
   const [rows] = await dbPool.query<RowDataPacket[]>(`
     SELECT YEAR(MAX(order_date)) AS latest_year
     FROM orders
+    INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = orders.payment_id
     WHERE order_date IS NOT NULL
+      AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+      AND LOWER(COALESCE(orders.order_status, '')) <> 'cancelled'
   `);
 
   return Number(rows[0]?.latest_year ?? new Date().getUTCFullYear());
@@ -36,8 +39,11 @@ export async function getRevenueSeries(): Promise<RevenuePoint[]> {
       DATE_FORMAT(order_date, '%Y-%m') AS month_key,
       COALESCE(SUM(total_amount), 0)   AS revenue
     FROM orders
+    INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = orders.payment_id
     WHERE order_date IS NOT NULL
       AND YEAR(order_date) = ?
+      AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+      AND LOWER(COALESCE(orders.order_status, '')) <> 'cancelled'
     GROUP BY DATE_FORMAT(order_date, '%Y-%m')
     ORDER BY DATE_FORMAT(order_date, '%Y-%m') ASC
   `,
@@ -72,8 +78,11 @@ export async function getSalesReport(
         COUNT(*) AS orders,
         COALESCE(SUM(total_amount), 0) AS gross_revenue
       FROM orders
+      INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = orders.payment_id
       WHERE order_date IS NOT NULL
         AND order_date >= DATE_SUB(CURDATE(), INTERVAL 4 WEEK)
+        AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+        AND LOWER(COALESCE(orders.order_status, '')) <> 'cancelled'
       GROUP BY YEARWEEK(order_date, 1), YEAR(order_date), WEEK(order_date, 1)
       ORDER BY YEARWEEK(order_date, 1) DESC
       LIMIT 4
@@ -96,8 +105,11 @@ export async function getSalesReport(
         COUNT(*) AS orders,
         COALESCE(SUM(total_amount), 0) AS gross_revenue
       FROM orders
+      INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = orders.payment_id
       WHERE order_date IS NOT NULL
         AND order_date >= DATE_SUB(CURDATE(), INTERVAL 5 YEAR)
+        AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+        AND LOWER(COALESCE(orders.order_status, '')) <> 'cancelled'
       GROUP BY YEAR(order_date)
       ORDER BY YEAR(order_date) DESC
       LIMIT 5
@@ -121,8 +133,11 @@ export async function getSalesReport(
       COUNT(*) AS orders,
       COALESCE(SUM(total_amount), 0) AS gross_revenue
     FROM orders
+    INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = orders.payment_id
     WHERE order_date IS NOT NULL
       AND YEAR(order_date) = ?
+      AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+      AND LOWER(COALESCE(orders.order_status, '')) <> 'cancelled'
     GROUP BY DATE_FORMAT(order_date, '%Y-%m')
     ORDER BY DATE_FORMAT(order_date, '%Y-%m') ASC
   `,
@@ -196,8 +211,11 @@ export async function getItemSalesReport(period: ReportPeriod): Promise<ItemSale
       END AS average_unit_price
     FROM order_item oi
     INNER JOIN orders o ON o.order_id = oi.order_id
+    INNER JOIN PAYMENT_DETAILS pd ON pd.payment_id = o.payment_id
     LEFT JOIN PRODUCT p ON p.product_id = oi.product_id
     WHERE o.order_date IS NOT NULL
+      AND LOWER(COALESCE(pd.payment_status, '')) = 'paid'
+      AND LOWER(COALESCE(o.order_status, '')) <> 'cancelled'
       AND ${scope.where}
     GROUP BY oi.product_id, p.product_name
     ORDER BY gross_sales DESC, quantity_sold DESC, product_name ASC

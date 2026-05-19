@@ -174,6 +174,8 @@ CREATE TABLE PICKUP (
     user_id           INT,
     pickup_date       DATETIME,
     pickup_status     VARCHAR(50),
+    releasing_officer_id INT,
+    released_at       DATETIME,
     CONSTRAINT fk_pickup_order
         FOREIGN KEY (order_id) REFERENCES orders(order_id),
     CONSTRAINT fk_pickup_customer_user

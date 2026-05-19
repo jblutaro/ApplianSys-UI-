@@ -1,5 +1,13 @@
 export type ProductStatus = "Active" | "Low Stock" | "Out of Stock";
-export type OrderStatus = "Processing" | "Shipped" | "Delivered" | "Pending";
+export type OrderStatus =
+  | "pending"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "preparing"
+  | "ready_for_pickup"
+  | "released";
 export type ReportPeriod = "weekly" | "monthly" | "yearly";
 
 export type Product = {
@@ -20,11 +28,36 @@ export type Order = {
   id: string;
   dbId: number;
   customer: string;
-  deliveryMethod: string;
+  customerContact: string;
+  deliveryMethod: "delivery" | "pickup";
+  fulfillmentMethod: "delivery" | "pickup";
   email: string;
   date: string;
+  createdAt: string;
+  items: string[];
+  paymentMethod: string;
+  paymentStatus: "paid" | "unpaid";
+  releasingOfficer: string;
+  releasedAt: string | null;
   total: number;
   status: OrderStatus;
+  orderStatus: OrderStatus;
+};
+
+export type PickupReleaseOrder = {
+  orderId: number;
+  orderRef: string;
+  customerName: string;
+  customerContact: string;
+  items: string[];
+  totalAmount: number;
+  paymentMethod: string;
+  paymentStatus: string;
+  orderStatus: string;
+  pickupStatus: string;
+  createdAt: string;
+  releasedAt: string | null;
+  releasingOfficer: string;
 };
 
 export type AdminSettings = {
@@ -224,6 +257,20 @@ export async function patchOrderStatus(orderId: number, status: OrderStatus) {
   return request<{ ok: true; orders: Order[] }>(`/api/admin/orders/${orderId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}
+
+export async function fetchPickupReleaseOrders() {
+  return request<{ ok: true; orders: PickupReleaseOrder[] }>("/api/admin/pickup-releases");
+}
+
+export async function releasePickupOrder(
+  orderId: number,
+  confirmPaymentReceived: boolean,
+) {
+  return request<{ ok: true; orders: PickupReleaseOrder[] }>(`/api/admin/pickup-releases/${orderId}/release`, {
+    method: "POST",
+    body: JSON.stringify({ confirmPaymentReceived }),
   });
 }
 

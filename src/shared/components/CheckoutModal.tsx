@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { CartItem } from "@/shared/lib/cartApi";
 import {
@@ -10,13 +10,13 @@ import {
 import "@/shared/styles/Checkout.css";
 import "leaflet/dist/leaflet.css";
 
-/* ── Leaflet icon fix (webpack/vite asset path issue) ── */
+/* Leaflet icon fix (webpack/vite asset path issue) */
 import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-// @ts-expect-error — override default icon URLs
+// @ts-expect-error override default icon URLs
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
@@ -24,7 +24,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-/* ── Types ── */
+/* Types */
 type Method = "delivery" | "pickup";
 type Step = 1 | 2 | 3 | 4;
 
@@ -62,15 +62,19 @@ type Props = {
   onSuccess: () => void;
 };
 
-/* ── Helpers ── */
+/* Helpers */
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-PH", { currency: "PHP", style: "currency" }).format(value);
 }
 
-const PAYMENT_OPTIONS = [
+const DELIVERY_PAYMENT_OPTIONS = [
+  { value: "GCash", desc: "Pay via GCash e-wallet" },
   { value: "Cash on Delivery", desc: "Pay when your order arrives" },
-  { value: "GCash",            desc: "Pay via GCash e-wallet" },
-  { value: "Bank Transfer",    desc: "Transfer to our bank account" },
+];
+
+const PICKUP_PAYMENT_OPTIONS = [
+  { value: "GCash", desc: "Pay via GCash e-wallet" },
+  { value: "Pay on Pick Up", desc: "Pay at the shop when claiming your order" },
 ];
 
 const STORE_ADDRESS = "Old Albay District, Legazpi City, Albay";
@@ -156,7 +160,7 @@ async function reverseGeocodeLocation(lat: number, lng: number): Promise<Partial
   };
 }
 
-/* ── Map component (lazy-loaded to avoid SSR issues) ── */
+/* Map component (lazy-loaded to avoid SSR issues) */
 function DeliveryMap({
   deliveryBounds,
   lat,
@@ -177,7 +181,7 @@ function DeliveryMap({
 
     const map = L.map(mapRef.current).setView([lat, lng], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: '(c) <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(map);
 
@@ -229,9 +233,9 @@ function DeliveryMap({
   return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
 }
 
-/* ══════════════════════════════
+/*
    Main component
-   ══════════════════════════════ */
+*/
 export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
@@ -257,6 +261,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const total = subtotal + shipping;
   const deliveryLocationInAlbay = isWithinAlbayDeliveryArea(lat, lng);
   const lookupRequestId = useRef(0);
+  const paymentOptions = method === "pickup" ? PICKUP_PAYMENT_OPTIONS : DELIVERY_PAYMENT_OPTIONS;
 
   useEffect(() => {
     void (async () => {
@@ -271,7 +276,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     })();
   }, []);
 
-  /* ── Geolocation ── */
+  /* Geolocation */
   const updatePinnedLocation = (nextLat: number, nextLng: number) => {
     setLat(nextLat);
     setLng(nextLng);
@@ -312,7 +317,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     );
   };
 
-  /* ── Step validation ── */
+  /* Step validation */
   const canProceedStep2 =
     method === "pickup" ||
     (address.street.trim() !== "" &&
@@ -366,7 +371,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     setSubmitError("Mock GCash payment opened in a new tab.");
   };
 
-  /* ── Submit ── */
+  /* Submit */
   const handlePlaceOrder = async () => {
     if (method === "delivery" && !deliveryLocationInAlbay) {
       setSubmitError("ApplianSys can only deliver within Albay. Please select a location inside Albay or choose pickup.");
@@ -379,6 +384,11 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
       const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
       setPlacedOrder(order);
       onSuccess();
+      if (method === "pickup" && paymentMethod === "Pay on Pick Up") {
+        setStep(4);
+        return;
+      }
+
       onClose();
       void navigate("/orders");
     } catch (err) {
@@ -388,12 +398,12 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     }
   };
 
-  /* ── Close on overlay click ── */
+  /* Close on overlay click */
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && step !== 4) onClose();
   };
 
-  /* ── Step labels ── */
+  /* Step labels */
   const STEPS = [
     { num: 1, label: "Method" },
     { num: 2, label: "Details" },
@@ -411,7 +421,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           </h2>
           {step !== 4 && (
             <button type="button" className="checkout-sheet__close" onClick={onClose} aria-label="Close checkout">
-              ✕
+              x
             </button>
           )}
         </div>
@@ -446,7 +456,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         {/* Body */}
         <div className="checkout-sheet__body">
 
-          {/* ── STEP 1: Method ── */}
+          {/* STEP 1: Method */}
           {step === 1 && (
             <>
               <p className="checkout-section-label">How would you like to receive your order?</p>
@@ -454,7 +464,12 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 <button
                   type="button"
                   className={`checkout-method-card${method === "delivery" ? " checkout-method-card--selected" : ""}`}
-                  onClick={() => setMethod("delivery")}
+                  onClick={() => {
+                    setMethod("delivery");
+                    if (!DELIVERY_PAYMENT_OPTIONS.some((option) => option.value === paymentMethod)) {
+                      setPaymentMethod(DELIVERY_PAYMENT_OPTIONS[0].value);
+                    }
+                  }}
                 >
                   <div className="checkout-method-card__icon">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -473,7 +488,12 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 <button
                   type="button"
                   className={`checkout-method-card${method === "pickup" ? " checkout-method-card--selected" : ""}`}
-                  onClick={() => setMethod("pickup")}
+                  onClick={() => {
+                    setMethod("pickup");
+                    if (!PICKUP_PAYMENT_OPTIONS.some((option) => option.value === paymentMethod)) {
+                      setPaymentMethod(PICKUP_PAYMENT_OPTIONS[0].value);
+                    }
+                  }}
                 >
                   <div className="checkout-method-card__icon">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -490,7 +510,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
             </>
           )}
 
-          {/* ── STEP 2: Details ── */}
+          {/* STEP 2: Details */}
           {step === 2 && method === "delivery" && (
             <>
               <p className="checkout-section-label">Delivery Address</p>
@@ -540,7 +560,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
               {/* Map pin */}
               <div className="checkout-map-label">
                 Pin your location
-                <span>optional — drag the marker or click the map</span>
+                <span>optional - drag the marker or click the map</span>
               </div>
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <button
@@ -550,7 +570,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                   onClick={handleGeolocate}
                   disabled={geoLocating}
                 >
-                  {geoLocating ? "Locating…" : "📍 Use my location"}
+                  {geoLocating ? "Locating..." : "Use my location"}
                 </button>
               </div>
               <div className="checkout-map-wrap">
@@ -577,7 +597,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
 
           {step === 2 && method === "pickup" && (
             <>
-              <p className="checkout-section-label">Pickup Location</p>
+              <p className="checkout-section-label">Pickup Information</p>
               <div className="checkout-pickup-info">
                 <div className="checkout-pickup-info__icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -588,21 +608,21 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 <div>
                   <p className="checkout-pickup-info__title">ApplianSys Main Store</p>
                   <p className="checkout-pickup-info__address">{STORE_ADDRESS}</p>
-                  <p className="checkout-pickup-info__hours">Mon–Sat · 8:00 AM – 6:00 PM</p>
+                  <p className="checkout-pickup-info__hours">Mon-Sat, 8:00 AM - 6:00 PM</p>
+                  <p className="checkout-pickup-info__address">
+                    Present your order reference number and a valid ID when claiming your item.
+                  </p>
                 </div>
-              </div>
-              <div className="checkout-map-wrap">
-                <DeliveryMap lat={14.5547} lng={121.0244} onPick={() => {}} />
               </div>
             </>
           )}
 
-          {/* Payment method — shown on step 2 */}
+          {/* Payment method - shown on step 2 */}
           {step === 2 && (
             <>
               <p className="checkout-section-label" style={{ marginTop: 24 }}>Payment Method</p>
               <div className="checkout-payment-options">
-                {PAYMENT_OPTIONS.map((opt) => (
+                {paymentOptions.map((opt) => (
                   <label
                     key={opt.value}
                     className={`checkout-payment-option${paymentMethod === opt.value ? " checkout-payment-option--selected" : ""}`}
@@ -622,7 +642,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
             </>
           )}
 
-          {/* ── STEP 3: Review ── */}
+          {/* STEP 3: Review */}
           {step === 3 && (
             <>
               <p className="checkout-section-label">Order Items</p>
@@ -694,7 +714,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
             </>
           )}
 
-          {/* ── STEP 4: Success ── */}
+          {/* STEP 4: Success */}
           {step === 4 && placedOrder && (
             <div className="checkout-success">
               <div className="checkout-success__icon">
@@ -708,8 +728,10 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
               </p>
               <p className="checkout-success__detail">
                 {placedOrder.deliveryMethod === "delivery"
-                  ? "Your order is being processed and will be delivered in 3–5 business days."
-                  : "Your order is ready for pickup at our store next business day."}
+                  ? "Your order is being processed and will be delivered in 3-5 business days."
+                  : paymentMethod === "Pay on Pick Up"
+                    ? "Your pickup order was placed. Payment will be collected at the shop. Present your order reference number when claiming the item."
+                    : "Your order is ready for pickup at our store next business day."}
                 {" "}Payment method: <strong>{paymentMethod}</strong>.
               </p>
               <div className="checkout-success__actions">
@@ -767,13 +789,13 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 onClick={() => void handlePlaceOrder()}
               >
                 {submitting ? (
-                  <><div className="checkout-spinner" /> Placing Order…</>
+                  <><div className="checkout-spinner" /> Placing Order...</>
                 ) : (
                   <>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    Place Order · {formatCurrency(total)}
+                    Place Order - {formatCurrency(total)}
                   </>
                 )}
               </button>

@@ -70,3 +70,77 @@ export async function getCustomerOrders(userId: number): Promise<CustomerOrder[]
 
   return [...orders.values()];
 }
+
+function normalizeStatus(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+export async function cancelCustomerOrder(userId: number, orderId: number) {
+  const connection = await dbPool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [orders] = await connection.query<RowDataPacket[]>(
+      `SELECT order_id, delivery_method, order_status
+       FROM orders
+       WHERE order_id = ? AND user_id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [orderId, userId],
+    );
+    const order = orders[0];
+
+    if (!order) {
+      await connection.rollback();
+      return { ok: false as const, message: "Order not found." };
+    }
+
+    const status = normalizeStatus(order.order_status);
+    if (["cancelled", "delivered", "released"].includes(status)) {
+      await connection.rollback();
+      return { ok: false as const, message: "This order can no longer be cancelled." };
+    }
+
+    const [items] = await connection.query<RowDataPacket[]>(
+      "SELECT product_id, quantity FROM order_item WHERE order_id = ?",
+      [orderId],
+    );
+
+    for (const item of items) {
+      await connection.query(
+        `UPDATE INVENTORY
+         SET stock_quantity = stock_quantity + ?,
+             last_updated = NOW()
+         WHERE product_id = ?`,
+        [Number(item.quantity), Number(item.product_id)],
+      );
+      await connection.query(
+        `UPDATE INVENTORY
+         SET status = CASE
+           WHEN stock_quantity <= 0 THEN 'Out of Stock'
+           WHEN stock_quantity < 15 THEN 'Low Stock'
+           ELSE 'Active'
+         END
+         WHERE product_id = ?`,
+        [Number(item.product_id)],
+      );
+    }
+
+    await connection.query("UPDATE orders SET order_status = 'cancelled' WHERE order_id = ?", [orderId]);
+
+    if (String(order.delivery_method || "delivery").toLowerCase() === "pickup") {
+      await connection.query("UPDATE PICKUP SET pickup_status = 'cancelled' WHERE order_id = ?", [orderId]);
+    } else {
+      await connection.query("UPDATE DELIVERY SET delivery_status = 'cancelled' WHERE order_id = ?", [orderId]);
+    }
+
+    await connection.commit();
+    return { ok: true as const };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

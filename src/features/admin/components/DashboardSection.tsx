@@ -27,7 +27,9 @@ export function DashboardSection({
   revenueOverTime,
   setPeriod,
 }: DashboardSectionProps) {
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = orders
+    .filter((order) => order.paymentStatus === "paid" && order.orderStatus !== "cancelled")
+    .reduce((sum, order) => sum + order.total, 0);
   const totalOrders = orders.length;
   const activeProducts = products.filter((product) => product.status === "Active").length;
   const lowInventory = products.filter((product) => product.status !== "Active").length;

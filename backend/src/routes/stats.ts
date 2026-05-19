@@ -63,14 +63,16 @@ statsRouter.get("/best-selling", async (_req, res, next) => {
         p.product_name,
         p.image_url,
         p.price,
-        COALESCE(SUM(oi.quantity), 0) AS total_sold,
-        COALESCE(SUM(oi.quantity * oi.price), 0) AS total_revenue
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(pd.payment_status, '')) = 'paid' AND LOWER(COALESCE(o.order_status, '')) <> 'cancelled' THEN oi.quantity ELSE 0 END), 0) AS total_sold,
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(pd.payment_status, '')) = 'paid' AND LOWER(COALESCE(o.order_status, '')) <> 'cancelled' THEN oi.quantity * oi.price ELSE 0 END), 0) AS total_revenue
       FROM PRODUCT p
       LEFT JOIN order_item oi ON oi.product_id = p.product_id
       LEFT JOIN orders o ON o.order_id = oi.order_id
-      WHERE o.order_date IS NULL OR o.order_date IS NOT NULL
+      LEFT JOIN PAYMENT_DETAILS pd ON pd.payment_id = o.payment_id
       GROUP BY p.product_id, p.product_name, p.image_url, p.price
-      ORDER BY total_sold DESC, total_revenue DESC
+      ORDER BY
+        SUM(CASE WHEN LOWER(COALESCE(pd.payment_status, '')) = 'paid' AND LOWER(COALESCE(o.order_status, '')) <> 'cancelled' THEN oi.quantity ELSE 0 END) DESC,
+        SUM(CASE WHEN LOWER(COALESCE(pd.payment_status, '')) = 'paid' AND LOWER(COALESCE(o.order_status, '')) <> 'cancelled' THEN oi.quantity * oi.price ELSE 0 END) DESC
       LIMIT 8
     `);
 

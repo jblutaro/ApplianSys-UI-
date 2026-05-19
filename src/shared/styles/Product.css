@@ -460,6 +460,30 @@
   text-align: center;
 }
 
+.pdp-cta__edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 14px;
+  background: var(--primary-gold);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 6px 20px rgba(170, 109, 39, 0.28);
+}
+
+.pdp-cta__edit:hover {
+  background: var(--primary-gold-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(170, 109, 39, 0.36);
+}
+
 /* Trust strip */
 .pdp-trust {
   display: grid;

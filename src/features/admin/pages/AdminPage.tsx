@@ -1,5 +1,5 @@
 import "@/shared/styles/Admin.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { AppUser } from "@/shared/lib/auth";
 import { AdminAccessState } from "../components/AdminAccessState";
@@ -57,6 +57,9 @@ function renderSectionContent({
         <OrdersSection
           orders={state.orders}
           onChangeStatus={state.handleOrderStatusChange}
+          isReleasing={state.isReleasingPickup}
+          pickupOrders={state.pickupReleaseOrders}
+          onReleaseOrder={state.handleReleasePickupOrder}
         />
       );
     case "platform":
@@ -95,6 +98,22 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
 
   const state = useAdminDashboard({    enabled: Boolean(user && isAllowed),
   });
+  const navItems = user ? getNavItems(user) : NAV_ITEMS;
+  const section = getSection(searchParams.get("section"), navItems);
+  const currentSectionLabel =
+    navItems.find((item) => item.key === section)?.label ?? "Dashboard";
+  const editProductId = searchParams.get("edit");
+
+  /* eslint-disable react-hooks/set-state-in-effect -- syncs ?edit= URL state into the product modal. */
+  useEffect(() => {
+    if (editProductId && section === "products" && !isProductModalOpen && !state.isLoading && state.products.length > 0) {
+      state.handleEditProduct(editProductId);
+      setIsProductModalOpen(true);
+      // Clear the edit param from URL to prevent re-triggering
+      setSearchParams({ section: "products" });
+    }
+  }, [editProductId, section, isProductModalOpen, state.isLoading, state.products.length, state, setSearchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!user) {
     return (
@@ -126,11 +145,6 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
       />
     );
   }
-
-  const navItems = getNavItems(user);
-  const section = getSection(searchParams.get("section"), navItems);
-  const currentSectionLabel =
-    navItems.find((item) => item.key === section)?.label ?? "Dashboard";
 
   return (
     <div className="admin-shell">
@@ -253,4 +267,3 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
 }
 
 export default AdminPage;
-

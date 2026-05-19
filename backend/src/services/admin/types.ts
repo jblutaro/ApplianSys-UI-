@@ -31,11 +31,20 @@ export type AdminOrder = {
   id: string;
   dbId: number;
   customer: string;
-  deliveryMethod: string;
+  customerContact: string;
+  deliveryMethod: "delivery" | "pickup";
+  fulfillmentMethod: "delivery" | "pickup";
   email: string;
   date: string;
+  createdAt: string;
+  items: string[];
+  paymentMethod: string;
+  paymentStatus: "paid" | "unpaid";
+  releasingOfficer: string;
+  releasedAt: string | null;
   total: number;
   status: string;
+  orderStatus: string;
 };
 
 export type RevenuePoint = {

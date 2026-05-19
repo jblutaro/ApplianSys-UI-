@@ -8,13 +8,16 @@ import {
   deleteSubSubcategory,
   fetchAdminCategories,
   fetchAdminDashboard,
+  fetchPickupReleaseOrders,
   fetchSalesReport,
   patchOrderStatus,
+  releasePickupOrder,
   updateAdminSettings,
   updateProduct,
   type Order,
   type OrderStatus,
   type Product,
+  type PickupReleaseOrder,
   type ReportPeriod,
   type RevenuePoint,
   type ItemSalesRow,
@@ -38,6 +41,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
     subSubcategoryName: "",
   });
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pickupReleaseOrders, setPickupReleaseOrders] = useState<PickupReleaseOrder[]>([]);
   const [settings, setSettings] = useState<AdminSettings>(EMPTY_SETTINGS);
   const [revenueOverTime, setRevenueOverTime] = useState<RevenuePoint[]>([]);
   const [reportRows, setReportRows] = useState<SalesReportRow[]>([]);
@@ -45,6 +49,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
   const [period, setPeriod] = useState<ReportPeriod>("monthly");
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isReleasingPickup, setIsReleasingPickup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [productDraft, setProductDraft] = useState<Product>(EMPTY_PRODUCT_DRAFT);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
@@ -59,9 +64,10 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
       setErrorMessage("");
 
       try {
-        const [response, categoriesResponse] = await Promise.all([
+        const [response, categoriesResponse, pickupReleaseResponse] = await Promise.all([
           fetchAdminDashboard(period),
           fetchAdminCategories(),
+          fetchPickupReleaseOrders(),
         ]);
         if (cancelled) return;
 
@@ -72,6 +78,7 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
         setRevenueOverTime(response.dashboard.revenueOverTime);
         setReportRows(response.dashboard.report);
         setItemSalesRows(response.dashboard.itemSales);
+        setPickupReleaseOrders(pickupReleaseResponse.orders);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load admin data.");
@@ -215,6 +222,8 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
       try {
         const response = await patchOrderStatus(order.dbId, status);
         setOrders(response.orders);
+        const pickupResponse = await fetchPickupReleaseOrders();
+        setPickupReleaseOrders(pickupResponse.orders);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Failed to update order status.");
       }
@@ -240,6 +249,27 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
     })();
   };
 
+  const handleReleasePickupOrder = (
+    orderId: number,
+    confirmPaymentReceived: boolean,
+  ) => {
+    void (async () => {
+      setIsReleasingPickup(true);
+      setErrorMessage("");
+
+      try {
+        const response = await releasePickupOrder(orderId, confirmPaymentReceived);
+        setPickupReleaseOrders(response.orders);
+        const dashboardResponse = await fetchAdminDashboard(period);
+        setOrders(dashboardResponse.dashboard.orders);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to release pickup order.");
+      } finally {
+        setIsReleasingPickup(false);
+      }
+    })();
+  };
+
   return {
     categories,
     categoryDraft,
@@ -253,12 +283,15 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
     handleDeleteSubSubcategory,
     handleEditProduct,
     handleOrderStatusChange,
+    handleReleasePickupOrder,
     handleSaveSettings,
     isLoading,
+    isReleasingPickup,
     isSavingSettings,
     editingProductId,
     orders,
     period,
+    pickupReleaseOrders,
     productDraft,
     products,
     itemSalesRows,

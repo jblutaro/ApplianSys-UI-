@@ -1,69 +1,167 @@
-import type { Order, OrderStatus } from "../lib/adminApi";
+import { useMemo, useState } from "react";
+import type { Order, OrderStatus, PickupReleaseOrder } from "../lib/adminApi";
 import { formatCurrency, getStatusClass } from "../lib/adminUtils";
+import { PickupReleaseSection } from "./PickupReleaseSection";
 
 type OrdersSectionProps = {
+  isReleasing: boolean;
   onChangeStatus: (id: string, status: OrderStatus) => void;
+  onReleaseOrder: (
+    orderId: number,
+    confirmPaymentReceived: boolean,
+  ) => void;
   orders: Order[];
+  pickupOrders: PickupReleaseOrder[];
 };
 
-export function OrdersSection({ onChangeStatus, orders }: OrdersSectionProps) {
+const DELIVERY_STATUS_OPTIONS: OrderStatus[] = [
+  "pending",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+];
+
+function formatDateTime(value: string) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatMethod(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatStatus(value: string) {
+  if (value === "ready_for_pickup") return "Ready for Pickup";
+  return formatMethod(value);
+}
+
+function isTerminalDeliveryStatus(status: string) {
+  return status === "delivered" || status === "cancelled";
+}
+
+export function OrdersSection({
+  isReleasing,
+  onChangeStatus,
+  onReleaseOrder,
+  orders,
+  pickupOrders,
+}: OrdersSectionProps) {
+  const [activeTab, setActiveTab] = useState<"delivery" | "pickup">("delivery");
+  const deliveryOrders = useMemo(
+    () => orders.filter((order) => order.fulfillmentMethod === "delivery"),
+    [orders],
+  );
+
   return (
-    <article className="admin-card">
-      <div className="admin-card__header">
-        <div>
-          <h2 className="admin-card__title">Orders</h2>
-          <p className="admin-card__sub">View and update customer order statuses.</p>
-        </div>
+    <div className="admin-orders-module">
+      <div className="admin-tabbar" role="tablist" aria-label="Orders">
+        <button
+          type="button"
+          className={`admin-tabbar__btn${activeTab === "delivery" ? " admin-tabbar__btn--active" : ""}`}
+          onClick={() => setActiveTab("delivery")}
+        >
+          Delivery Orders
+        </button>
+        <button
+          type="button"
+          className={`admin-tabbar__btn${activeTab === "pickup" ? " admin-tabbar__btn--active" : ""}`}
+          onClick={() => setActiveTab("pickup")}
+        >
+          Pickup Orders
+        </button>
       </div>
 
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Customer</th>
-              <th>Method</th>
-              <th>Date</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Update Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order.id}>
-                <td className="admin-table__strong">{order.id}</td>
-                <td>
-                  <div className="admin-order-customer">
-                    <span>{order.customer}</span>
-                    <small>{order.email}</small>
-                  </div>
-                </td>
-                <td>{order.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</td>
-                <td>{order.date}</td>
-                <td>{formatCurrency(order.total)}</td>
-                <td>
-                  <span className={`admin-status admin-status--${getStatusClass(order.status)}`}>
-                    {order.status}
-                  </span>
-                </td>
-                <td>
-                  <select
-                    className="admin-select"
-                    value={order.status}
-                    onChange={(event) => onChangeStatus(order.id, event.target.value as OrderStatus)}
-                  >
-                    <option value="Processing">Processing</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </article>
+      {activeTab === "delivery" ? (
+        <article className="admin-card">
+          <div className="admin-card__header">
+            <div>
+              <h2 className="admin-card__title">Delivery Orders</h2>
+              <p className="admin-card__sub">Manage delivery fulfillment without mixing pickup workflows.</p>
+            </div>
+          </div>
+
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Items</th>
+                  <th>Date</th>
+                  <th>Total</th>
+                  <th>Payment Method</th>
+                  <th>Payment Status</th>
+                  <th>Delivery Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveryOrders.length === 0 ? (
+                  <tr>
+                    <td className="admin-table__empty" colSpan={9}>
+                      No delivery orders found.
+                    </td>
+                  </tr>
+                ) : (
+                  deliveryOrders.map((order) => (
+                    <tr key={order.id}>
+                      <td className="admin-table__strong">{order.id}</td>
+                      <td>
+                        <div className="admin-order-customer">
+                          <span>{order.customer}</span>
+                          <small>{order.email}</small>
+                        </div>
+                      </td>
+                      <td className="admin-table__muted">{order.items.join(", ")}</td>
+                      <td>{formatDateTime(order.createdAt)}</td>
+                      <td>{formatCurrency(order.total)}</td>
+                      <td>{formatMethod(order.paymentMethod)}</td>
+                      <td>
+                        <span className={`admin-status admin-status--${getStatusClass(order.paymentStatus)}`}>
+                          {formatStatus(order.paymentStatus)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`admin-status admin-status--${getStatusClass(order.orderStatus)}`}>
+                          {formatStatus(order.orderStatus)}
+                        </span>
+                      </td>
+                      <td>
+                        <select
+                          className="admin-select"
+                          value={order.orderStatus}
+                          disabled={isTerminalDeliveryStatus(order.orderStatus)}
+                          onChange={(event) => onChangeStatus(order.id, event.target.value as OrderStatus)}
+                        >
+                          {DELIVERY_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {formatStatus(status)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      ) : (
+        <PickupReleaseSection
+          orders={pickupOrders}
+          isReleasing={isReleasing}
+          onReleaseOrder={onReleaseOrder}
+          onChangeStatus={onChangeStatus}
+        />
+      )}
+    </div>
   );
 }

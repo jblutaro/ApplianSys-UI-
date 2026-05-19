@@ -29,6 +29,9 @@ const ALBAY_DELIVERY_BOUNDS = {
   west: 123.25,
 };
 
+const DELIVERY_PAYMENT_METHODS = new Set(["gcash", "cash_on_delivery"]);
+const PICKUP_PAYMENT_METHODS = new Set(["gcash", "pay_on_pickup"]);
+
 function isWithinAlbayDeliveryArea(latitude: number | null, longitude: number | null) {
   if (latitude === null || longitude === null) return false;
 
@@ -38,6 +41,16 @@ function isWithinAlbayDeliveryArea(latitude: number | null, longitude: number | 
     longitude >= ALBAY_DELIVERY_BOUNDS.west &&
     longitude <= ALBAY_DELIVERY_BOUNDS.east
   );
+}
+
+function normalizePaymentMethod(method: string) {
+  const normalized = method.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (normalized === "pay_on_pick_up") {
+    return "pay_on_pickup";
+  }
+
+  return normalized;
 }
 
 async function resolveCustomerUserId(
@@ -94,10 +107,21 @@ checkoutRouter.post("/", async (req, res, next) => {
       res.status(400).json({ ok: false, message: "paymentMethod is required." });
       return;
     }
+    const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+
+    if (fulfillment.method === "delivery" && !DELIVERY_PAYMENT_METHODS.has(normalizedPaymentMethod)) {
+      res.status(400).json({ ok: false, message: "Delivery supports only GCash or Cash on Delivery." });
+      return;
+    }
+
+    if (fulfillment.method === "pickup" && !PICKUP_PAYMENT_METHODS.has(normalizedPaymentMethod)) {
+      res.status(400).json({ ok: false, message: "Pickup supports only GCash or Pay on Pick Up." });
+      return;
+    }
 
     const result = await placeOrder(userId, {
       fulfillment,
-      paymentMethod,
+      paymentMethod: normalizedPaymentMethod,
     });
 
     if (!result.ok) {

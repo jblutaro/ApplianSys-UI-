@@ -68,8 +68,42 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-/** Ensure checkout tables support unassigned delivery/pickup records plus address + geo data. */
-async function ensureCheckoutSchema() {
+function normalizePaymentMethod(method: string, fulfillmentMethod: DeliveryMethod) {
+  const normalized = method.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (normalized === "gcash") {
+    return {
+      orderStatus: "pending",
+      paymentMethod: "gcash",
+      paymentStatus: "paid",
+    };
+  }
+
+  if (normalized === "cash_on_delivery") {
+    return {
+      orderStatus: "pending",
+      paymentMethod: "cash_on_delivery",
+      paymentStatus: "unpaid",
+    };
+  }
+
+  if (normalized === "pay_on_pick_up" || normalized === "pay_on_pickup") {
+    return {
+      orderStatus: "pending",
+      paymentMethod: "pay_on_pickup",
+      paymentStatus: "unpaid",
+    };
+  }
+
+  return {
+    orderStatus: "pending",
+    paymentMethod: normalized,
+    paymentStatus: "unpaid",
+  };
+}
+
+/** Ensure checkout tables support unassigned delivery/pickup records plus address, geo, and release data. */
+export async function ensureCheckoutSchema() {
   if (checkoutSchemaReady) return;
 
   const [rows] = await dbPool.query<RowDataPacket[]>(
@@ -117,6 +151,23 @@ async function ensureCheckoutSchema() {
     await dbPool.query("ALTER TABLE PICKUP MODIFY user_id INT NULL");
   }
 
+  const [pickupColumnRows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'PICKUP'
+       AND COLUMN_NAME IN ('releasing_officer_id', 'released_at')`,
+  );
+  const pickupColumns = new Set(pickupColumnRows.map((row) => String(row.COLUMN_NAME)));
+
+  if (!pickupColumns.has("releasing_officer_id")) {
+    await dbPool.query("ALTER TABLE PICKUP ADD COLUMN releasing_officer_id INT NULL AFTER pickup_status");
+  }
+
+  if (!pickupColumns.has("released_at")) {
+    await dbPool.query("ALTER TABLE PICKUP ADD COLUMN released_at DATETIME NULL AFTER releasing_officer_id");
+  }
+
   const [fkRows] = await dbPool.query<RowDataPacket[]>(
     `SELECT TABLE_NAME, CONSTRAINT_NAME, REFERENCED_TABLE_NAME
      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
@@ -160,6 +211,7 @@ export async function placeOrder(
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const settings = await readAdminSettings();
+  const paymentDetails = normalizePaymentMethod(input.paymentMethod, input.fulfillment.method);
   const deliveryDistanceKm =
     input.fulfillment.method === "delivery"
       ? calculateDistanceKm(OLD_ALBAY_SHOP_LOCATION, {
@@ -198,7 +250,7 @@ export async function placeOrder(
     const [paymentResult] = await connection.query<ResultSetHeader>(
       `INSERT INTO PAYMENT_DETAILS (payment_amount, payment_method, payment_date, payment_status)
        VALUES (?, ?, NOW(), ?)`,
-      [totalAmount, input.paymentMethod, "Pending"],
+      [totalAmount, paymentDetails.paymentMethod, paymentDetails.paymentStatus],
     );
     const paymentId = paymentResult.insertId;
 
@@ -211,7 +263,7 @@ export async function placeOrder(
         userId,
         paymentId,
         totalAmount,
-        "Pending",
+        paymentDetails.orderStatus,
         input.fulfillment.method,
       ],
     );
@@ -248,7 +300,7 @@ export async function placeOrder(
           userId,
           deliveryFee,
           estimatedDateStr,
-          "Pending",
+          "pending",
           addressStr,
           f.latitude ?? null,
           f.longitude ?? null,
@@ -262,7 +314,7 @@ export async function placeOrder(
       await connection.query(
         `INSERT INTO PICKUP (order_id, user_id, pickup_date, pickup_status)
          VALUES (?, ?, ?, ?)`,
-        [orderId, userId, pickupDate.toISOString().slice(0, 19).replace("T", " "), "Pending"],
+        [orderId, userId, pickupDate.toISOString().slice(0, 19).replace("T", " "), "pending"],
       );
     }
 
@@ -309,7 +361,7 @@ export async function placeOrder(
       deliveryFee,
       totalAmount,
       deliveryMethod: input.fulfillment.method,
-      status: "Pending",
+      status: paymentDetails.orderStatus,
       items: cartItems.map((i: CartItemRow) => ({
         productId: i.productId,
         productName: i.productName,
