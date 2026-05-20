@@ -1,0 +1,4 @@
+[5/20/2026, 7:04:47 PM] Login test started
+[5/20/2026, 7:04:50 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_before_submit.png
+[5/20/2026, 7:04:51 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_after_login.png
+[5/20/2026, 7:04:51 PM] PASSED: User logged in and account menu appeared

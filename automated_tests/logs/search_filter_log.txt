@@ -1,0 +1,4 @@
+[5/20/2026, 7:05:00 PM] Search/filter test started
+[5/20/2026, 7:05:02 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\search_filter_test_before_search.png
+[5/20/2026, 7:05:02 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\search_filter_test_results.png
+[5/20/2026, 7:05:02 PM] PASSED: Search submitted and results page appeared

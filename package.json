@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "test": "node automated_tests/run_tests.mjs",
     "start": "vite --open",
     "start:frontend": "vite --open",
     "start:backend": "npm --prefix backend run dev",

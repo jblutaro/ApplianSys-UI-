@@ -1,0 +1,11 @@
+[5/20/2026, 7:04:46 PM] Started test_login.mjs
+[5/20/2026, 7:04:52 PM] PASSED test_login.mjs
+[5/20/2026, 7:04:52 PM] Started test_registration_validation.mjs
+[5/20/2026, 7:04:56 PM] PASSED test_registration_validation.mjs
+[5/20/2026, 7:04:56 PM] Started test_product_crud.mjs
+[5/20/2026, 7:04:59 PM] PASSED test_product_crud.mjs
+[5/20/2026, 7:04:59 PM] Started test_search_filter.mjs
+[5/20/2026, 7:05:02 PM] PASSED test_search_filter.mjs
+[5/20/2026, 7:05:02 PM] Started test_checkout_order_flow.mjs
+[5/20/2026, 7:05:06 PM] PASSED test_checkout_order_flow.mjs
+[5/20/2026, 7:05:06 PM] Run all completed. Passed=5, Failed=0

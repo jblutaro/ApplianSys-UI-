@@ -1,0 +1,19 @@
+{
+  "name": "ecommerce-automated-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript automated testing activity for the E-commerce System project.",
+  "scripts": {
+    "test": "node run_tests.mjs",
+    "test:login": "node test_login.mjs",
+    "test:registration": "node test_registration_validation.mjs",
+    "test:product": "node test_product_crud.mjs",
+    "test:search": "node test_search_filter.mjs",
+    "test:checkout": "node test_checkout_order_flow.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.1",
+    "project-name": "file:.."
+  }
+}
