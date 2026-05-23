@@ -4,8 +4,13 @@ import { dbPool } from "../../config/database.js";
 export type CustomerOrder = {
   id: string;
   dbId: number;
+  completedAt: string | null;
   date: string;
   deliveryMethod: "delivery" | "pickup";
+  paymentMethod: string;
+  paymentStatus: string;
+  releasedAt: string | null;
+  releasingOfficer: string;
   status: string;
   total: number;
   items: {
@@ -26,12 +31,19 @@ export async function getCustomerOrders(userId: number): Promise<CustomerOrder[]
       o.total_amount,
       o.order_status,
       o.delivery_method,
+      pd.payment_method,
+      pd.payment_status,
+      pck.released_at,
+      CONCAT(ro.fname, ' ', ro.lname) AS releasing_officer,
       oi.product_id,
       oi.quantity,
       oi.price,
       p.product_name,
       COALESCE(p.image_url, p.product_image, '') AS image_url
     FROM orders o
+    LEFT JOIN PAYMENT_DETAILS pd ON pd.payment_id = o.payment_id
+    LEFT JOIN PICKUP pck ON pck.order_id = o.order_id
+    LEFT JOIN \`USER\` ro ON ro.user_id = pck.releasing_officer_id
     INNER JOIN order_item oi ON oi.order_id = o.order_id
     INNER JOIN PRODUCT p ON p.product_id = oi.product_id
     WHERE o.user_id = ?
@@ -45,13 +57,19 @@ export async function getCustomerOrders(userId: number): Promise<CustomerOrder[]
   for (const row of rows) {
     const orderId = Number(row.order_id);
     const existing = orders.get(orderId);
+    const releasedAt = row.released_at ? new Date(row.released_at).toISOString() : null;
     const order =
       existing ??
       ({
         id: `ORD-${String(orderId).padStart(4, "0")}`,
         dbId: orderId,
+        completedAt: releasedAt,
         date: row.order_date ? new Date(row.order_date).toISOString().slice(0, 10) : "",
         deliveryMethod: row.delivery_method === "pickup" ? "pickup" : "delivery",
+        paymentMethod: String(row.payment_method || ""),
+        paymentStatus: String(row.payment_status || ""),
+        releasedAt,
+        releasingOfficer: String(row.releasing_officer || ""),
         status: String(row.order_status || "Pending"),
         total: Number(row.total_amount),
         items: [],

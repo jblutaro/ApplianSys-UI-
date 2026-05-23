@@ -1,11 +1,12 @@
 import type { AdminSettings, Product } from "./adminApi";
 
-export type AdminSection = "dashboard" | "products" | "orders" | "platform" | "settings";
+export type AdminSection = "dashboard" | "products" | "orders" | "orderArchives" | "platform" | "settings";
 
 export const NAV_ITEMS: { key: AdminSection; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "products", label: "Products" },
   { key: "orders", label: "Orders" },
+  { key: "orderArchives", label: "Order Archives" },
   { key: "platform", label: "Platform" },
   { key: "settings", label: "Settings" },
 ];

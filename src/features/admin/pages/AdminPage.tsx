@@ -55,6 +55,18 @@ function renderSectionContent({
     case "orders":
       return (
         <OrdersSection
+          mode="active"
+          orders={state.orders}
+          onChangeStatus={state.handleOrderStatusChange}
+          isReleasing={state.isReleasingPickup}
+          pickupOrders={state.pickupReleaseOrders}
+          onReleaseOrder={state.handleReleasePickupOrder}
+        />
+      );
+    case "orderArchives":
+      return (
+        <OrdersSection
+          mode="archive"
           orders={state.orders}
           onChangeStatus={state.handleOrderStatusChange}
           isReleasing={state.isReleasingPickup}

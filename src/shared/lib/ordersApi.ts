@@ -3,8 +3,13 @@ import { requestJson } from "@/shared/lib/http";
 export type CustomerOrder = {
   id: string;
   dbId: number;
+  completedAt: string | null;
   date: string;
   deliveryMethod: "delivery" | "pickup";
+  paymentMethod: string;
+  paymentStatus: string;
+  releasedAt: string | null;
+  releasingOfficer: string;
   status: string;
   total: number;
   items: {

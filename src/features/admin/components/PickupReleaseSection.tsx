@@ -4,6 +4,7 @@ import { formatCurrency, getStatusClass } from "../lib/adminUtils";
 
 type PickupReleaseSectionProps = {
   isReleasing: boolean;
+  mode: "active" | "archive";
   orders: PickupReleaseOrder[];
   onReleaseOrder: (
     orderId: number,
@@ -53,6 +54,7 @@ function canOpenRelease(order: PickupReleaseOrder) {
 
 export function PickupReleaseSection({
   isReleasing,
+  mode,
   orders,
   onReleaseOrder,
 }: PickupReleaseSectionProps) {
@@ -61,12 +63,16 @@ export function PickupReleaseSection({
   const [paymentStatus, setPaymentStatus] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<PickupReleaseOrder | null>(null);
   const [confirmPaymentReceived, setConfirmPaymentReceived] = useState(false);
+  const isArchive = mode === "archive";
 
   const filteredOrders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return orders.filter((order) => {
       const status = (order.orderStatus || order.pickupStatus).toLowerCase();
+      const matchesArchiveMode = isArchive
+        ? isTerminalPickupStatus(status) || status === "failed"
+        : !isTerminalPickupStatus(status) && status !== "failed";
       const matchesQuery =
         !normalizedQuery ||
         order.orderRef.toLowerCase().includes(normalizedQuery) ||
@@ -75,9 +81,9 @@ export function PickupReleaseSection({
       const matchesPaymentStatus =
         paymentStatus === "all" || order.paymentStatus.toLowerCase() === paymentStatus;
 
-      return matchesQuery && matchesPickupStatus && matchesPaymentStatus;
+      return matchesArchiveMode && matchesQuery && matchesPickupStatus && matchesPaymentStatus;
     });
-  }, [orders, paymentStatus, pickupStatus, query]);
+  }, [isArchive, orders, paymentStatus, pickupStatus, query]);
 
   const canReleaseSelected =
     Boolean(selectedOrder) &&
@@ -108,7 +114,9 @@ export function PickupReleaseSection({
         <div>
           <h2 className="admin-card__title">Pickup Orders</h2>
           <p className="admin-card__sub">
-            Manage pickup fulfillment, payment settlement, and release records.
+            {isArchive
+              ? "Review completed, cancelled, and released pickup records."
+              : "Manage active pickup fulfillment, payment settlement, and release records."}
           </p>
         </div>
 
@@ -172,7 +180,7 @@ export function PickupReleaseSection({
             {filteredOrders.length === 0 ? (
               <tr>
                 <td className="admin-table__empty" colSpan={11}>
-                  No pickup orders found.
+                  {isArchive ? "No archived orders yet." : "No active orders."}
                 </td>
               </tr>
             ) : (
@@ -205,7 +213,7 @@ export function PickupReleaseSection({
                     <td>{order.releasingOfficer || "Not released yet"}</td>
                     <td>{formatDateTime(order.releasedAt)}</td>
                     <td>
-                      {canOpenRelease(order) ? (
+                      {!isArchive && canOpenRelease(order) ? (
                         <div className="admin-inline-actions admin-inline-actions--compact">
                           <button
                             type="button"
@@ -216,6 +224,8 @@ export function PickupReleaseSection({
                             Release
                           </button>
                         </div>
+                      ) : isArchive ? (
+                        <span className="admin-table__muted">Archived</span>
                       ) : null}
                     </td>
                   </tr>

@@ -6,7 +6,13 @@ import { cancelOrder, fetchOrders, type CustomerOrder } from "@/shared/lib/order
 import "@/shared/styles/Orders.css";
 
 type FulfillmentFilter = "all" | "delivery" | "pickup";
-type StatusFilter = "all" | "pending" | "shipping" | "shipped" | "delivered" | "preparing" | "ready_for_pickup";
+type OrdersView = "active" | "archive";
+type StatusFilter = "all" | "pending" | "shipping" | "shipped" | "delivered" | "preparing" | "ready_for_pickup" | "released" | "cancelled" | "failed";
+
+const ORDER_VIEWS: { key: OrdersView; label: string }[] = [
+  { key: "active", label: "Orders" },
+  { key: "archive", label: "Order Archives" },
+];
 
 const FULFILLMENT_FILTERS: { key: FulfillmentFilter; label: string }[] = [
   { key: "all", label: "All orders" },
@@ -18,7 +24,6 @@ const DELIVERY_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All delivery" },
   { key: "pending", label: "Pending" },
   { key: "shipping", label: "Shipping" },
-  { key: "delivered", label: "Delivered" },
 ];
 
 const PICKUP_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
@@ -27,6 +32,16 @@ const PICKUP_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "preparing", label: "Preparing" },
   { key: "ready_for_pickup", label: "Ready" },
 ];
+
+const ARCHIVE_STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All archived" },
+  { key: "delivered", label: "Delivered" },
+  { key: "released", label: "Released" },
+  { key: "cancelled", label: "Cancelled" },
+  { key: "failed", label: "Failed" },
+];
+
+const ARCHIVED_STATUSES = new Set(["delivered", "released", "cancelled", "failed"]);
 
 // Status badge color
 const STATUS_COLOR: Record<string, string> = {
@@ -40,7 +55,13 @@ const STATUS_COLOR: Record<string, string> = {
   Shipped: "#2980b9",
   shipped: "#2980b9",
   Delivered: "#27ae60",
+  released: "#0d8a5c",
+  failed: "#b42318",
 };
+
+function normalizeStatus(value: string) {
+  return value.toLowerCase().replace(/[\s-]+/g, "_");
+}
 
 function formatStatusLabel(value: string) {
   if (value === "ready_for_pickup") return "Ready for Pickup";
@@ -52,12 +73,51 @@ function formatStatusLabel(value: string) {
     .join(" ");
 }
 
+function formatToken(value: string) {
+  if (!value.trim()) return "Not available";
+  if (value === "ready_for_pickup") return "Ready for Pickup";
+
+  return value
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatPaymentStatus(value: string) {
+  const normalized = normalizeStatus(value);
+  if (normalized === "paid") return "Paid";
+  if (normalized === "unpaid") return "Unsettled";
+  return formatToken(value);
+}
+
+function getDisplayStatus(order: CustomerOrder) {
+  const status = formatStatusLabel(order.status);
+  if (order.deliveryMethod === "pickup" && !ARCHIVED_STATUSES.has(normalizeStatus(order.status))) {
+    return `${status} - ${formatPaymentStatus(order.paymentStatus)}`;
+  }
+
+  return status;
+}
+
+function isArchivedOrder(order: CustomerOrder) {
+  return ARCHIVED_STATUSES.has(normalizeStatus(order.status));
+}
+
 type OrdersPageProps = {
   onAuthOpen: () => void;
   user: AppUser | null;
 };
 
 function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
+  const [activeView, setActiveView] = useState<OrdersView>("active");
   const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -119,8 +179,12 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
     );
   }
 
-  const filtered = orders.filter((o) => {
-    const normalizedStatus = o.status.toLowerCase().replace(/\s+/g, "_");
+  const visibleOrders = orders.filter((order) => (
+    activeView === "archive" ? isArchivedOrder(order) : !isArchivedOrder(order)
+  ));
+
+  const filtered = visibleOrders.filter((o) => {
+    const normalizedStatus = normalizeStatus(o.status);
     const matchesFulfillment =
       fulfillmentFilter === "all" || o.deliveryMethod === fulfillmentFilter;
     const matchesStatus =
@@ -155,6 +219,23 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
 
       <div className="orders-toolbar">
         <div className="orders-filter-groups">
+          <div className="orders-tabs" aria-label="Order sections">
+            {ORDER_VIEWS.map((view) => (
+              <button
+                key={view.key}
+                type="button"
+                className={`orders-tab${activeView === view.key ? " orders-tab--active" : ""}`}
+                onClick={() => {
+                  setActiveView(view.key);
+                  setFulfillmentFilter("all");
+                  setStatusFilter("all");
+                }}
+              >
+                {view.label}
+              </button>
+            ))}
+          </div>
+
           <div className="orders-tabs" aria-label="Order type filters">
             {FULFILLMENT_FILTERS.map((filter) => (
               <button
@@ -171,7 +252,20 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
             ))}
           </div>
 
-          {fulfillmentFilter !== "all" ? (
+          {activeView === "archive" ? (
+            <div className="orders-tabs" aria-label="Archive status filters">
+              {ARCHIVE_STATUS_FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  className={`orders-tab${statusFilter === filter.key ? " orders-tab--active" : ""}`}
+                  onClick={() => setStatusFilter(filter.key)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          ) : fulfillmentFilter !== "all" ? (
             <div className="orders-tabs" aria-label="Order status filters">
               {(fulfillmentFilter === "delivery" ? DELIVERY_STATUS_FILTERS : PICKUP_STATUS_FILTERS).map((filter) => (
                 <button
@@ -216,22 +310,25 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
             <rect x="9" y="3" width="6" height="4" rx="1"/>
             <path d="M9 12h6M9 16h4"/>
           </svg>
-          <p className="orders-empty__text">No orders found.</p>
+          <p className="orders-empty__text">
+            {activeView === "archive" ? "No archived orders yet." : "No active orders."}
+          </p>
         </div>
       ) : (
         <div className="orders-list">
           {filtered.map((order) => (
             (() => {
-              const normalizedStatus = order.status.toLowerCase().replace(/\s+/g, "_");
+              const normalizedStatus = normalizeStatus(order.status);
               const canCancel = !["cancelled", "delivered", "released"].includes(normalizedStatus);
+              const statusColor = STATUS_COLOR[order.status] ?? STATUS_COLOR[normalizedStatus];
 
               return (
               <div key={order.id} className="order-card">
                 <div className="order-card__header">
                   <span className="order-card__id">Order #{order.id}</span>
                   <span className="order-card__date">Placed on: {order.date}</span>
-                  <span className="order-card__status" style={{ color: STATUS_COLOR[order.status] }}>
-                    Status: <strong>{formatStatusLabel(order.status)}</strong>
+                  <span className="order-card__status" style={{ color: statusColor }}>
+                    Status: <strong>{getDisplayStatus(order)}</strong>
                   </span>
                   <span className="order-card__date">
                     {order.deliveryMethod === "pickup" ? "Store pickup" : "Home delivery"}
@@ -280,6 +377,24 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                       </button>
                     ) : null}
                   </div>
+                </div>
+
+                <div className="order-card__meta">
+                  <span>Method: <strong>{order.deliveryMethod === "pickup" ? "Pickup" : "Delivery"}</strong></span>
+                  <span>Payment: <strong>{formatToken(order.paymentMethod)} - {formatPaymentStatus(order.paymentStatus)}</strong></span>
+                  {activeView === "archive" ? (
+                    <>
+                      <span>Final Status: <strong>{formatStatusLabel(order.status)}</strong></span>
+                      <span>
+                        Completed: <strong>{formatDateTime(order.completedAt || order.releasedAt)}</strong>
+                      </span>
+                      {order.deliveryMethod === "pickup" && normalizeStatus(order.status) === "released" ? (
+                        <span>
+                          Releasing Account: <strong>{order.releasingOfficer || "Not available"}</strong>
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               </div>
               );

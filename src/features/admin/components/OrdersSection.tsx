@@ -5,6 +5,7 @@ import { PickupReleaseSection } from "./PickupReleaseSection";
 
 type OrdersSectionProps = {
   isReleasing: boolean;
+  mode: "active" | "archive";
   onChangeStatus: (id: string, status: OrderStatus) => void;
   onReleaseOrder: (
     orderId: number,
@@ -21,6 +22,8 @@ const DELIVERY_STATUS_OPTIONS: OrderStatus[] = [
   "delivered",
   "cancelled",
 ];
+
+const ARCHIVED_STATUSES = new Set(["delivered", "released", "cancelled", "failed"]);
 
 function formatDateTime(value: string) {
   if (!value) return "Not available";
@@ -46,17 +49,26 @@ function isTerminalDeliveryStatus(status: string) {
   return status === "delivered" || status === "cancelled";
 }
 
+function isArchivedStatus(status: string) {
+  return ARCHIVED_STATUSES.has(status.toLowerCase());
+}
+
 export function OrdersSection({
   isReleasing,
+  mode,
   onChangeStatus,
   onReleaseOrder,
   orders,
   pickupOrders,
 }: OrdersSectionProps) {
   const [activeTab, setActiveTab] = useState<"delivery" | "pickup">("delivery");
+  const isArchive = mode === "archive";
   const deliveryOrders = useMemo(
-    () => orders.filter((order) => order.fulfillmentMethod === "delivery"),
-    [orders],
+    () => orders.filter((order) => (
+      order.fulfillmentMethod === "delivery" &&
+      (isArchive ? isArchivedStatus(order.orderStatus) : !isArchivedStatus(order.orderStatus))
+    )),
+    [isArchive, orders],
   );
 
   return (
@@ -83,7 +95,11 @@ export function OrdersSection({
           <div className="admin-card__header">
             <div>
               <h2 className="admin-card__title">Delivery Orders</h2>
-              <p className="admin-card__sub">Manage delivery fulfillment without mixing pickup workflows.</p>
+              <p className="admin-card__sub">
+                {isArchive
+                  ? "Review completed, cancelled, and inactive delivery orders."
+                  : "Manage active delivery fulfillment without mixing pickup workflows."}
+              </p>
             </div>
           </div>
 
@@ -106,7 +122,7 @@ export function OrdersSection({
                 {deliveryOrders.length === 0 ? (
                   <tr>
                     <td className="admin-table__empty" colSpan={9}>
-                      No delivery orders found.
+                      {isArchive ? "No archived orders yet." : "No active orders."}
                     </td>
                   </tr>
                 ) : (
@@ -134,18 +150,22 @@ export function OrdersSection({
                         </span>
                       </td>
                       <td>
-                        <select
-                          className="admin-select"
-                          value={order.orderStatus}
-                          disabled={isTerminalDeliveryStatus(order.orderStatus)}
-                          onChange={(event) => onChangeStatus(order.id, event.target.value as OrderStatus)}
-                        >
-                          {DELIVERY_STATUS_OPTIONS.map((status) => (
-                            <option key={status} value={status}>
-                              {formatStatus(status)}
-                            </option>
-                          ))}
-                        </select>
+                        {isArchive ? (
+                          <span className="admin-table__muted">Archived</span>
+                        ) : (
+                          <select
+                            className="admin-select"
+                            value={order.orderStatus}
+                            disabled={isTerminalDeliveryStatus(order.orderStatus)}
+                            onChange={(event) => onChangeStatus(order.id, event.target.value as OrderStatus)}
+                          >
+                            {DELIVERY_STATUS_OPTIONS.map((status) => (
+                              <option key={status} value={status}>
+                                {formatStatus(status)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -159,6 +179,7 @@ export function OrdersSection({
           orders={pickupOrders}
           isReleasing={isReleasing}
           onReleaseOrder={onReleaseOrder}
+          mode={mode}
         />
       )}
     </div>
