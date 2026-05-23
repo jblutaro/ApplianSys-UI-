@@ -159,7 +159,6 @@ export function OrdersSection({
           orders={pickupOrders}
           isReleasing={isReleasing}
           onReleaseOrder={onReleaseOrder}
-          onChangeStatus={onChangeStatus}
         />
       )}
     </div>

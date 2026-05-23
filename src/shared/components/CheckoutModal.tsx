@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { CartItem } from "@/shared/lib/cartApi";
 import {
@@ -62,6 +62,24 @@ type Props = {
   onSuccess: () => void;
 };
 
+type MockGcashCompletionEvent = {
+  order?: PlacedOrder;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  paidAt?: string;
+  receiptNumber?: string;
+  sessionId?: string;
+  totalAmount?: number;
+  type?: string;
+};
+
+type GcashPaymentReview = {
+  paidAt: string;
+  paymentMethod: "GCash";
+  paymentStatus: "Paid";
+  receiptNumber: string;
+};
+
 /* Helpers */
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-PH", { currency: "PHP", style: "currency" }).format(value);
@@ -115,6 +133,25 @@ function calculateDistanceKm(
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function formatMethodLabel(value: Method | PlacedOrder["deliveryMethod"]) {
+  return value === "delivery" ? "Home Delivery" : "Store Pickup";
+}
+
+function formatOrderStatus(value: string) {
+  if (value === "ready_for_pickup") return "Ready for Pickup";
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function createMockGcashSessionId() {
@@ -253,6 +290,8 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [gcashPaymentReview, setGcashPaymentReview] = useState<GcashPaymentReview | null>(null);
+  const mockGcashSessionIdRef = useRef<string | null>(null);
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const deliveryDistanceKm =
@@ -262,6 +301,50 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const deliveryLocationInAlbay = isWithinAlbayDeliveryArea(lat, lng);
   const lookupRequestId = useRef(0);
   const paymentOptions = method === "pickup" ? PICKUP_PAYMENT_OPTIONS : DELIVERY_PAYMENT_OPTIONS;
+  const completedGcashOrder = Boolean(placedOrder && gcashPaymentReview);
+  const reviewItems = placedOrder?.items ?? items;
+  const reviewSubtotal = placedOrder ? placedOrder.totalAmount - placedOrder.deliveryFee : subtotal;
+  const reviewShipping = placedOrder ? placedOrder.deliveryFee : shipping;
+  const reviewTotal = placedOrder ? placedOrder.totalAmount : total;
+  const reviewDistanceKm = placedOrder ? placedOrder.deliveryDistanceKm : deliveryDistanceKm;
+  const reviewMethod = formatMethodLabel(placedOrder?.deliveryMethod ?? method);
+  const reviewOrderStatus = placedOrder
+    ? placedOrder.deliveryMethod === "pickup"
+      ? `${formatOrderStatus(placedOrder.status)} - Paid`
+      : formatOrderStatus(placedOrder.status)
+    : "";
+
+  const handleMockGcashCompleted = useCallback((event: MockGcashCompletionEvent) => {
+    if (!event || typeof event !== "object") {
+      return;
+    }
+
+    if (
+      event.type !== "GCASH_PAYMENT_SUCCESS" ||
+      !event.sessionId ||
+      event.sessionId !== mockGcashSessionIdRef.current ||
+      !event.order ||
+      event.paymentMethod !== "GCash" ||
+      event.paymentStatus !== "Paid" ||
+      !event.paidAt
+    ) {
+      return;
+    }
+
+    mockGcashSessionIdRef.current = null;
+    setPlacedOrder(event.order);
+    setGcashPaymentReview({
+      paidAt: event.paidAt,
+      paymentMethod: "GCash",
+      paymentStatus: "Paid",
+      receiptNumber: event.receiptNumber ?? "",
+    });
+    setPaymentMethod("GCash");
+    setSubmitting(false);
+    setSubmitError("");
+    setStep(3);
+    onSuccess();
+  }, [onSuccess]);
 
   useEffect(() => {
     void (async () => {
@@ -275,6 +358,40 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const parseCompletion = (value: string | null) => {
+      if (!value) return null;
+
+      try {
+        return JSON.parse(value) as MockGcashCompletionEvent;
+      } catch {
+        return null;
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== "appliansys:checkout-completed") return;
+      const completion = parseCompletion(event.newValue);
+      if (!completion) return;
+
+      handleMockGcashCompleted(completion);
+      localStorage.removeItem("appliansys:checkout-completed");
+    };
+
+    const handleMessage = (event: MessageEvent<MockGcashCompletionEvent>) => {
+      if (event.origin !== window.location.origin) return;
+      handleMockGcashCompleted(event.data);
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [handleMockGcashCompleted]);
 
   /* Geolocation */
   const updatePinnedLocation = (nextLat: number, nextLng: number) => {
@@ -346,6 +463,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     }
 
     const sessionId = createMockGcashSessionId();
+    mockGcashSessionIdRef.current = sessionId;
 
     localStorage.setItem(
       `appliansys:mock-gcash:${sessionId}`,
@@ -361,7 +479,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     );
 
     const gatewayUrl = `/mock-gcash-payment?session=${encodeURIComponent(sessionId)}`;
-    const paymentWindow = window.open(gatewayUrl, "_blank", "noopener,noreferrer");
+    const paymentWindow = window.open(gatewayUrl, "_blank", "popup,width=520,height=760");
 
     if (!paymentWindow) {
       setSubmitError("Popup blocked. Please allow popups and try GCash again.");
@@ -384,13 +502,13 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
       const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
       setPlacedOrder(order);
       onSuccess();
-      if (method === "pickup" && paymentMethod === "Pay on Pick Up") {
-        setStep(4);
+      if (paymentMethod === "Cash on Delivery" || paymentMethod === "Pay on Pick Up") {
+        onClose();
+        void navigate("/orders");
         return;
       }
 
-      onClose();
-      void navigate("/orders");
+      setStep(4);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to place order.");
     } finally {
@@ -645,9 +763,62 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           {/* STEP 3: Review */}
           {step === 3 && (
             <>
-              <p className="checkout-section-label">Order Items</p>
+              {completedGcashOrder ? (
+                <>
+                  <div className="checkout-review-confirmation">
+                    <div className="checkout-review-confirmation__icon">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3>Payment Successful</h3>
+                      <p>Your order has been placed and recorded as paid.</p>
+                    </div>
+                  </div>
+
+                  <div className="checkout-review-summary">
+                    <div>
+                      <span>Receiving Method</span>
+                      <strong>{reviewMethod}</strong>
+                    </div>
+                    <div>
+                      <span>Payment Method</span>
+                      <strong>{gcashPaymentReview?.paymentMethod}</strong>
+                    </div>
+                    <div>
+                      <span>Payment Status</span>
+                      <strong>{gcashPaymentReview?.paymentStatus}</strong>
+                    </div>
+                    <div>
+                      <span>Order Status</span>
+                      <strong>{reviewOrderStatus}</strong>
+                    </div>
+                    <div>
+                      <span>Order Reference</span>
+                      <strong>{placedOrder?.orderRef}</strong>
+                    </div>
+                    <div>
+                      <span>Total Paid</span>
+                      <strong>{formatCurrency(reviewTotal)}</strong>
+                    </div>
+                    <div>
+                      <span>Date and Time Paid</span>
+                      <strong>{gcashPaymentReview ? formatDateTime(gcashPaymentReview.paidAt) : "Not available"}</strong>
+                    </div>
+                    {gcashPaymentReview?.receiptNumber ? (
+                      <div>
+                        <span>Receipt No.</span>
+                        <strong>{gcashPaymentReview.receiptNumber}</strong>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              <p className="checkout-section-label">{completedGcashOrder ? "Confirmed Items" : "Order Items"}</p>
               <div className="checkout-review-items">
-                {items.map((item) => (
+                {reviewItems.map((item) => (
                   <div key={item.productId} className="checkout-review-item">
                     <div className="checkout-review-item__img">
                       {item.imageUrl ? (
@@ -672,19 +843,19 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
               <div className="checkout-review-totals">
                 <div className="checkout-review-row">
                   <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                  <span>{formatCurrency(reviewSubtotal)}</span>
                 </div>
                 <div className="checkout-review-row">
                   <span>Shipping</span>
                   <span>
                     {method === "delivery"
-                      ? `${formatCurrency(shipping)} (${deliveryDistanceKm.toFixed(2)} km)`
+                      ? `${formatCurrency(reviewShipping)} (${reviewDistanceKm.toFixed(2)} km)`
                       : "Free"}
                   </span>
                 </div>
                 <div className="checkout-review-row checkout-review-row--total">
                   <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
+                  <span>{formatCurrency(reviewTotal)}</span>
                 </div>
               </div>
 
@@ -703,7 +874,9 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
 
               <div className="checkout-review-address">
                 <p className="checkout-review-address__label">Payment</p>
-                <p className="checkout-review-address__value">{paymentMethod}</p>
+                <p className="checkout-review-address__value">
+                  {paymentMethod}{completedGcashOrder ? " - Paid" : ""}
+                </p>
               </div>
 
               {submitError && (
@@ -749,7 +922,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         {/* Footer */}
         {step !== 4 && (
           <div className="checkout-sheet__footer">
-            {step > 1 && (
+            {step > 1 && !completedGcashOrder && (
               <button
                 type="button"
                 className="checkout-btn-back"
@@ -781,7 +954,26 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
               </button>
             )}
 
-            {step === 3 && (
+            {step === 3 && completedGcashOrder && (
+              <>
+                <button
+                  type="button"
+                  className="checkout-btn-back"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
+                <Link
+                  to="/orders"
+                  className="checkout-btn-next checkout-btn-next--link"
+                  onClick={onClose}
+                >
+                  View My Orders
+                </Link>
+              </>
+            )}
+
+            {step === 3 && !completedGcashOrder && (
               <button
                 type="button"
                 className="checkout-btn-next"

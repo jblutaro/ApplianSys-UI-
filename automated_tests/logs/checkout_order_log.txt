@@ -3,3 +3,8 @@
 [5/20/2026, 7:05:05 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\checkout_order_flow_test_checkout_modal.png
 [5/20/2026, 7:05:05 PM] Checkout modal opened because cart had available items
 [5/20/2026, 7:05:05 PM] PASSED: Customer cart/order flow page was reachable
+[5/20/2026, 9:29:57 PM] Checkout/order flow test started
+[5/20/2026, 9:29:59 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\checkout_order_flow_test_cart_page.png
+[5/20/2026, 9:30:00 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\checkout_order_flow_test_checkout_modal.png
+[5/20/2026, 9:30:00 PM] Checkout modal opened because cart had available items
+[5/20/2026, 9:30:00 PM] PASSED: Customer cart/order flow page was reachable

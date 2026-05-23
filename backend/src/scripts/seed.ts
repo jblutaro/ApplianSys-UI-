@@ -150,7 +150,7 @@ async function seedProductsAndInventory() {
     const subcategoryId = await getSubcategoryIdByName(product.subcategory);
     const [productResult] = await dbPool.query(
       "INSERT INTO PRODUCT (subcategory_id, product_name, product_description, price, product_image) VALUES (?, ?, ?, ?, ?)",
-      [subcategoryId, product.name, product.description, product.price, ""],
+      [subcategoryId, product.name, product.description, product.price, null],
     );
     const productId = (productResult as { insertId: number }).insertId;
 
@@ -192,17 +192,24 @@ async function seedUsersAndOrders() {
     const userId = (result as { insertId: number }).insertId;
     createdUserIds.push(userId);
 
-    await dbPool.query(
-      "INSERT INTO CUSTOMER_USER (user_id, street, barangay, city, province) VALUES (?, ?, ?, ?, ?)",
-      [userId, "Sample Street", "Barangay 1", "Quezon City", "Metro Manila"],
-    );
+    if (user[6] === "customer") {
+      await dbPool.query(
+        "INSERT INTO CUSTOMER_USER (user_id, street, barangay, city, province) VALUES (?, ?, ?, ?, ?)",
+        [userId, "Sample Street", "Barangay 1", "Legazpi City", "Albay"],
+      );
+    } else {
+      await dbPool.query(
+        "INSERT INTO STAFF_USER (user_id, role_type) VALUES (?, ?)",
+        [userId, user[6]],
+      );
+    }
   }
 
   const payments = [
-    [72999, "GCash", "Paid"],
-    [32499, "Credit Card", "Paid"],
-    [12499, "Cash on Delivery", "Pending"],
-    [10999, "GCash", "Paid"],
+    [72999, "gcash", "paid"],
+    [32499, "gcash", "paid"],
+    [12499, "pay_on_pickup", "unpaid"],
+    [10999, "gcash", "paid"],
   ];
 
   const paymentIds: number[] = [];
@@ -216,17 +223,79 @@ async function seedUsersAndOrders() {
   }
 
   const orders = [
-    [createdUserIds[0], null, paymentIds[0], "2026-04-01 09:00:00", 72999, "Processing", "Delivery"],
-    [createdUserIds[1], null, paymentIds[1], "2026-04-03 11:15:00", 32499, "Shipped", "Delivery"],
-    [createdUserIds[2], null, paymentIds[2], "2026-04-04 14:20:00", 12499, "Delivered", "Pickup"],
-    [createdUserIds[3], null, paymentIds[3], "2026-04-06 16:40:00", 10999, "Pending", "Delivery"],
+    {
+      row: [createdUserIds[0], null, paymentIds[0], "2026-04-01 09:00:00", 72999, "processing", "delivery"],
+      itemName: "Smart Fridge Master 3000",
+      quantity: 1,
+      price: 72999,
+    },
+    {
+      row: [createdUserIds[1], null, paymentIds[1], "2026-04-03 11:15:00", 32499, "shipped", "delivery"],
+      itemName: "EcoWash Pro Machine",
+      quantity: 1,
+      price: 32499,
+    },
+    {
+      row: [createdUserIds[2], null, paymentIds[2], "2026-04-04 14:20:00", 12499, "ready_for_pickup", "pickup"],
+      itemName: "PulseBeat Soundbar X",
+      quantity: 1,
+      price: 12499,
+    },
+    {
+      row: [createdUserIds[3], null, paymentIds[3], "2026-04-06 16:40:00", 10999, "pending", "delivery"],
+      itemName: "AirPurify 360",
+      quantity: 1,
+      price: 10999,
+    },
   ];
 
   for (const order of orders) {
-    await dbPool.query(
+    const [orderResult] = await dbPool.query(
       "INSERT INTO orders (user_id, promo_id, payment_id, order_date, total_amount, order_status, delivery_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      order,
+      order.row,
     );
+    const orderId = (orderResult as { insertId: number }).insertId;
+    const userId = Number(order.row[0]);
+    const orderDate = String(order.row[3]);
+    const status = String(order.row[5]);
+    const method = String(order.row[6]);
+    const [productRows] = await dbPool.query(
+      "SELECT product_id FROM PRODUCT WHERE product_name = ? LIMIT 1",
+      [order.itemName],
+    );
+    const productId = (productRows as Array<{ product_id: number }>)[0]?.product_id;
+
+    if (!productId) {
+      throw new Error(`Seed product not found: ${order.itemName}`);
+    }
+
+    await dbPool.query(
+      "INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
+      [orderId, productId, order.quantity, order.price],
+    );
+
+    if (method === "delivery") {
+      await dbPool.query(
+        `INSERT INTO DELIVERY
+          (order_id, user_id, delivery_fee, estimated_date, delivery_status, delivery_address, latitude, longitude)
+         VALUES (?, ?, ?, DATE_ADD(DATE(?), INTERVAL 4 DAY), ?, ?, ?, ?)`,
+        [
+          orderId,
+          userId,
+          50,
+          orderDate,
+          status,
+          "Sample Street, Barangay 1, Legazpi City, Albay",
+          13.1391,
+          123.7438,
+        ],
+      );
+    } else {
+      await dbPool.query(
+        "INSERT INTO PICKUP (order_id, user_id, pickup_date, pickup_status) VALUES (?, ?, DATE_ADD(?, INTERVAL 1 DAY), ?)",
+        [orderId, userId, orderDate, status],
+      );
+    }
   }
 }
 

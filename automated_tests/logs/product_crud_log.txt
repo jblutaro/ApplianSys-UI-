@@ -2,3 +2,7 @@
 [5/20/2026, 7:04:59 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\product_crud_test_products_page.png
 [5/20/2026, 7:04:59 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\product_crud_test_product_search.png
 [5/20/2026, 7:04:59 PM] PASSED: Admin products page loaded and search/read check completed
+[5/20/2026, 9:29:18 PM] Product CRUD test started
+[5/20/2026, 9:29:20 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\product_crud_test_products_page.png
+[5/20/2026, 9:29:20 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\product_crud_test_product_search.png
+[5/20/2026, 9:29:20 PM] PASSED: Admin products page loaded and search/read check completed

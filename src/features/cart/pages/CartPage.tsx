@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { AppUser } from "@/shared/lib/auth";
 import {
   fetchCart,
@@ -43,7 +43,6 @@ function CartSkeleton() {
 }
 
 function CartPage({ user, onAuthOpen }: CartPageProps) {
-  const navigate = useNavigate();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -76,19 +75,6 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
     void Promise.resolve().then(loadCart);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCustomer]);
-
-  useEffect(() => {
-    const handleCheckoutCompleted = (event: StorageEvent) => {
-      if (event.key !== "appliansys:checkout-completed") return;
-
-      setCheckoutOpen(false);
-      setItems([]);
-      void navigate("/orders");
-    };
-
-    window.addEventListener("storage", handleCheckoutCompleted);
-    return () => window.removeEventListener("storage", handleCheckoutCompleted);
-  }, [isCustomer, navigate]);
 
   const setPending = (productId: number, pending: boolean) => {
     setPendingIds((prev) => {

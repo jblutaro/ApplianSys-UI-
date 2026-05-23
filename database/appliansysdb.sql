@@ -10,8 +10,8 @@ CREATE TABLE `USER` (
     email          VARCHAR(255) NOT NULL UNIQUE,
     password       VARCHAR(255) NOT NULL,
     contact_num    VARCHAR(30),
-    status         VARCHAR(50),
-    created_at     DATETIME,
+    status         VARCHAR(50) DEFAULT 'Active',
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_login     DATETIME,
     user_type      VARCHAR(20) NOT NULL
 );
@@ -81,8 +81,8 @@ CREATE TABLE INVENTORY (
     inventory_id     INT AUTO_INCREMENT PRIMARY KEY,
     product_id       INT NOT NULL,
     stock_quantity   INT NOT NULL,
-    status           VARCHAR(50),
-    last_updated     DATETIME,
+    status           VARCHAR(50) DEFAULT 'Active',
+    last_updated     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_inventory_product
         FOREIGN KEY (product_id) REFERENCES PRODUCT(product_id)
 );
@@ -121,8 +121,8 @@ CREATE TABLE PAYMENT_DETAILS (
     payment_id        INT AUTO_INCREMENT PRIMARY KEY,
     payment_amount    DECIMAL(10,2) NOT NULL,
     payment_method    VARCHAR(50) NOT NULL,
-    payment_date      DATETIME,
-    payment_status    VARCHAR(50)
+    payment_date      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    payment_status    VARCHAR(50) DEFAULT 'unpaid'
 );
 
 CREATE TABLE orders (
@@ -130,9 +130,9 @@ CREATE TABLE orders (
     user_id           INT NOT NULL,
     promo_id          INT,
     payment_id        INT,
-    order_date        DATETIME,
+    order_date        DATETIME DEFAULT CURRENT_TIMESTAMP,
     total_amount      DECIMAL(10,2) NOT NULL,
-    order_status      VARCHAR(50),
+    order_status      VARCHAR(50) DEFAULT 'pending',
     delivery_method   VARCHAR(20),
     CONSTRAINT fk_order_customer_user
         FOREIGN KEY (user_id) REFERENCES CUSTOMER_USER(user_id),
@@ -159,7 +159,7 @@ CREATE TABLE DELIVERY (
     user_id            INT,
     delivery_fee       DECIMAL(10,2),
     estimated_date     DATE,
-    delivery_status    VARCHAR(50),
+    delivery_status    VARCHAR(50) DEFAULT 'pending',
     delivery_address   TEXT,
     latitude           DECIMAL(10,7),
     longitude          DECIMAL(10,7),
@@ -173,7 +173,7 @@ CREATE TABLE PICKUP (
     order_id          INT PRIMARY KEY,
     user_id           INT,
     pickup_date       DATETIME,
-    pickup_status     VARCHAR(50),
+    pickup_status     VARCHAR(50) DEFAULT 'pending',
     releasing_officer_id INT,
     released_at       DATETIME,
     CONSTRAINT fk_pickup_order

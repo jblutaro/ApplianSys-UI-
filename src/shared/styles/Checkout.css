@@ -593,6 +593,74 @@
   line-height: 1.5;
 }
 
+.checkout-review-confirmation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(13, 138, 92, 0.18);
+  border-radius: 16px;
+  background: rgba(13, 138, 92, 0.08);
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.checkout-review-confirmation__icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(13, 138, 92, 0.12);
+  color: #0d8a5c;
+}
+
+.checkout-review-confirmation h3 {
+  margin: 0 0 4px;
+  color: var(--text-main);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.checkout-review-confirmation p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.checkout-review-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.checkout-review-summary div {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+.checkout-review-summary span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-light);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.checkout-review-summary strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 /* ══════════════════════════════
    STEP 4 — Success
    ══════════════════════════════ */
@@ -702,6 +770,13 @@
   animation: co-spin 0.7s linear infinite;
 }
 
+.checkout-btn-next--link {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  text-decoration: none;
+}
+
 @keyframes co-spin {
   to { transform: rotate(360deg); }
 }
@@ -725,6 +800,10 @@
   }
 
   .checkout-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-review-summary {
     grid-template-columns: 1fr;
   }
 }

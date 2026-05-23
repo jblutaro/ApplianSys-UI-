@@ -30,6 +30,52 @@ function isAllowedProductImageValue(value: string) {
   );
 }
 
+function parseProductPayload(body: Record<string, unknown> | null | undefined) {
+  const source = body ?? {};
+  const name = typeof source.name === "string" ? source.name.trim() : "";
+  const category = typeof source.category === "string" ? source.category.trim() : "";
+  const subcategory = typeof source.subcategory === "string" ? source.subcategory.trim() : "";
+  const subSubcategory = typeof source.subSubcategory === "string" ? source.subSubcategory.trim() : "";
+  const description = typeof source.description === "string" ? source.description.trim() : "";
+  const image = typeof source.image === "string" ? source.image.trim() : "";
+  const price = Number(source.price);
+  const stock = Number(source.stock);
+
+  if (!name || !category || !subcategory) {
+    return { ok: false as const, message: "Product name, category, and subcategory are required." };
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return { ok: false as const, message: "Product price must be greater than zero." };
+  }
+
+  if (!Number.isInteger(stock) || stock < 0) {
+    return { ok: false as const, message: "Product stock must be a non-negative integer." };
+  }
+
+  if (!isAllowedProductImageValue(image)) {
+    return { ok: false as const, message: "Product photo must be an image file." };
+  }
+
+  if (image.length > 3_000_000) {
+    return { ok: false as const, message: "Product photo must be 2 MB or smaller." };
+  }
+
+  return {
+    ok: true as const,
+    product: {
+      category,
+      subcategory,
+      subSubcategory,
+      description,
+      image,
+      name,
+      price,
+      stock,
+    },
+  };
+}
+
 adminProductsRouter.get("/products", async (_req, res, next) => {
   try {
     const products = await getProducts();
@@ -232,43 +278,13 @@ adminProductsRouter.delete("/sub-subcategories/:subSubcategoryId", async (req, r
 
 adminProductsRouter.post("/products", async (req, res, next) => {
   try {
-    const { name, category, subcategory, subSubcategory, description, image, price, stock } = req.body as {
-      category?: string;
-      subcategory?: string;
-      subSubcategory?: string;
-      description?: string;
-      image?: string;
-      name?: string;
-      price?: number;
-      stock?: number;
-    };
-
-    if (!name || !category || !subcategory) {
-      res.status(400).json({ ok: false, message: "Product name, category, and subcategory are required." });
+    const payload = parseProductPayload(req.body as Record<string, unknown>);
+    if (!payload.ok) {
+      res.status(400).json({ ok: false, message: payload.message });
       return;
     }
 
-    const normalizedImage = typeof image === "string" ? image.trim() : "";
-    if (!isAllowedProductImageValue(normalizedImage)) {
-      res.status(400).json({ ok: false, message: "Product photo must be an image file." });
-      return;
-    }
-
-    if (normalizedImage.length > 3_000_000) {
-      res.status(400).json({ ok: false, message: "Product photo must be 2 MB or smaller." });
-      return;
-    }
-
-    const products = await createProduct({
-      category,
-      subcategory,
-      subSubcategory,
-      description: description ?? "",
-      image: normalizedImage,
-      name,
-      price,
-      stock,
-    });
+    const products = await createProduct(payload.product);
     res.status(201).json({ ok: true, products });
   } catch (error) {
     next(error);
@@ -284,43 +300,13 @@ adminProductsRouter.put("/products/:productId", async (req, res, next) => {
   }
 
   try {
-    const { name, category, subcategory, subSubcategory, description, image, price, stock } = req.body as {
-      category?: string;
-      subcategory?: string;
-      subSubcategory?: string;
-      description?: string;
-      image?: string;
-      name?: string;
-      price?: number;
-      stock?: number;
-    };
-
-    if (!name || !category || !subcategory) {
-      res.status(400).json({ ok: false, message: "Product name, category, and subcategory are required." });
+    const payload = parseProductPayload(req.body as Record<string, unknown>);
+    if (!payload.ok) {
+      res.status(400).json({ ok: false, message: payload.message });
       return;
     }
 
-    const normalizedImage = typeof image === "string" ? image.trim() : "";
-    if (!isAllowedProductImageValue(normalizedImage)) {
-      res.status(400).json({ ok: false, message: "Product photo must be an image file." });
-      return;
-    }
-
-    if (normalizedImage.length > 3_000_000) {
-      res.status(400).json({ ok: false, message: "Product photo must be 2 MB or smaller." });
-      return;
-    }
-
-    const result = await updateProduct(productId, {
-      category,
-      subcategory,
-      subSubcategory,
-      description: description ?? "",
-      image: normalizedImage,
-      name,
-      price,
-      stock,
-    });
+    const result = await updateProduct(productId, payload.product);
 
     if (!result.ok) {
       res.status(404).json({ ok: false, message: "Product not found." });

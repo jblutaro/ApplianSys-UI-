@@ -190,29 +190,52 @@ export async function createLocalUser(
   const middleName = profile?.middleName?.trim() ?? "";
   const lastName = profile?.lastName?.trim() || "";
   const contactNumber = profile?.contactNumber?.trim() ?? "";
-  const [result] = await dbPool.query<ResultSetHeader>(
-    `INSERT INTO \`USER\`
-      (account_id, fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`,
-    [
-      accountId,
-      firstName,
-      middleName,
-      lastName,
-      normalizedEmail,
-      passwordHash,
-      contactNumber,
-      "Active",
-      userType,
-    ],
-  );
+  const connection = await dbPool.getConnection();
 
-  await dbPool.query<ResultSetHeader>(
-    "INSERT INTO CUSTOMER_USER (user_id, street, barangay, city, province) VALUES (?, ?, ?, ?, ?)",
-    [result.insertId, "", "", "", ""],
-  );
+  let userId = 0;
+  try {
+    await connection.beginTransaction();
 
-  const createdUser = await findUserById(result.insertId);
+    const [result] = await connection.query<ResultSetHeader>(
+      `INSERT INTO \`USER\`
+        (account_id, fname, mname, lname, email, password, contact_num, status, created_at, last_login, user_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`,
+      [
+        accountId,
+        firstName,
+        middleName || null,
+        lastName,
+        normalizedEmail,
+        passwordHash,
+        contactNumber || null,
+        "Active",
+        userType,
+      ],
+    );
+
+    userId = result.insertId;
+
+    if (userType === "customer") {
+      await connection.query<ResultSetHeader>(
+        "INSERT INTO CUSTOMER_USER (user_id) VALUES (?)",
+        [userId],
+      );
+    } else {
+      await connection.query<ResultSetHeader>(
+        "INSERT INTO STAFF_USER (user_id, role_type) VALUES (?, ?)",
+        [userId, userType],
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  const createdUser = await findUserById(userId);
   if (!createdUser) {
     throw new Error("Could not load created user.");
   }

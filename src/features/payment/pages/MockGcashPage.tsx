@@ -144,6 +144,18 @@ export default function MockGcashPage() {
       });
       const nextReceiptRef = generateReceiptRef();
       const nextPaidAt = new Date();
+      const successEvent = {
+        at: nextPaidAt.getTime(),
+        order,
+        orderId: order.orderId,
+        paidAt: nextPaidAt.toISOString(),
+        paymentMethod: "GCash",
+        paymentStatus: "Paid",
+        receiptNumber: nextReceiptRef,
+        sessionId: session.sessionId,
+        totalAmount: order.totalAmount,
+        type: "GCASH_PAYMENT_SUCCESS",
+      };
 
       setPlacedOrder(order);
       setReceiptRef(nextReceiptRef);
@@ -152,8 +164,10 @@ export default function MockGcashPage() {
       localStorage.removeItem(`appliansys:mock-gcash:${session.sessionId}`);
       localStorage.setItem(
         "appliansys:checkout-completed",
-        JSON.stringify({ orderId: order.orderId, sessionId: session.sessionId, at: nextPaidAt.getTime() }),
+        JSON.stringify(successEvent),
       );
+      const openerWindow = window.opener as Window | null;
+      openerWindow?.postMessage(successEvent, window.location.origin);
       void sendMockGcashReceiptEmail({
         orderId: order.orderId,
         paidAt: nextPaidAt.toISOString(),

@@ -44,7 +44,7 @@ async function ensureProductImageColumns() {
 
 async function saveProductImage(input: string | undefined) {
   const trimmed = input?.trim() ?? "";
-  if (!trimmed) return "";
+  if (!trimmed) return null;
 
   if (trimmed.startsWith("/api/uploads/products/")) {
     return trimmed;
@@ -63,9 +63,16 @@ async function saveProductImage(input: string | undefined) {
 }
 
 async function ensureCategoryAndSubcategory(categoryName: string, subcategoryName: string) {
+  const normalizedCategoryName = categoryName.trim();
+  const normalizedSubcategoryName = subcategoryName.trim();
+
+  if (!normalizedCategoryName || !normalizedSubcategoryName) {
+    throw new Error("Category and subcategory are required.");
+  }
+
   const category = await dbPool.query<RowDataPacket[]>(
     "SELECT category_id FROM CATEGORY WHERE category_name = ? LIMIT 1",
-    [categoryName],
+    [normalizedCategoryName],
   );
 
   let categoryId = category[0][0]?.category_id as number | undefined;
@@ -73,14 +80,14 @@ async function ensureCategoryAndSubcategory(categoryName: string, subcategoryNam
   if (!categoryId) {
     const insertCategory = await dbPool.query<ResultSetHeader>(
       "INSERT INTO CATEGORY (category_name, category_description) VALUES (?, ?)",
-      [categoryName, `${categoryName} appliances`],
+      [normalizedCategoryName, null],
     );
     categoryId = insertCategory[0].insertId;
   }
 
   const subcategory = await dbPool.query<RowDataPacket[]>(
     "SELECT subcategory_id FROM SUBCATEGORY WHERE category_id = ? AND subcategory_name = ? LIMIT 1",
-    [categoryId, subcategoryName],
+    [categoryId, normalizedSubcategoryName],
   );
 
   let subcategoryId = subcategory[0][0]?.subcategory_id as number | undefined;
@@ -88,7 +95,7 @@ async function ensureCategoryAndSubcategory(categoryName: string, subcategoryNam
   if (!subcategoryId) {
     const insertSubcategory = await dbPool.query<ResultSetHeader>(
       "INSERT INTO SUBCATEGORY (category_id, subcategory_name, subcategory_description) VALUES (?, ?, ?)",
-      [categoryId, subcategoryName, `${subcategoryName} under ${categoryName}`],
+      [categoryId, normalizedSubcategoryName, null],
     );
     subcategoryId = insertSubcategory[0].insertId;
   }
@@ -110,7 +117,7 @@ async function ensureSubSubcategory(subcategoryId: number, subSubcategoryName: s
 
   const [result] = await dbPool.query<ResultSetHeader>(
     "INSERT INTO SUB_SUBCATEGORY (subcategory_id, sub_subcategory_name, sub_subcategory_description) VALUES (?, ?, ?)",
-    [subcategoryId, trimmed, `${trimmed} sub-subcategory`],
+    [subcategoryId, trimmed, null],
   );
 
   return result.insertId;
@@ -398,8 +405,25 @@ export async function createProduct(input: {
 }) {
   await ensureProductImageColumns();
 
+  const name = input.name.trim();
+  const description = input.description?.trim() || null;
+  const price = Number(input.price);
+  const stock = Number(input.stock);
+
+  if (!name) {
+    throw new Error("Product name is required.");
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Product price must be greater than zero.");
+  }
+
+  if (!Number.isInteger(stock) || stock < 0) {
+    throw new Error("Product stock must be a non-negative integer.");
+  }
+
   const subcategoryId = await ensureCategoryAndSubcategory(input.category, input.subcategory);
-  const subSubcategoryId = input.subSubcategory
+  const subSubcategoryId = input.subSubcategory?.trim()
     ? await ensureSubSubcategory(subcategoryId, input.subSubcategory)
     : null;
   const imageUrl = await saveProductImage(input.image);
@@ -408,10 +432,10 @@ export async function createProduct(input: {
     [
       subcategoryId,
       subSubcategoryId,
-      input.name,
-      input.description ?? "",
+      name,
+      description,
       imageUrl,
-      Number(input.price ?? 0),
+      price,
       null,
     ],
   );
@@ -420,8 +444,8 @@ export async function createProduct(input: {
     "INSERT INTO INVENTORY (product_id, stock_quantity, status, last_updated) VALUES (?, ?, ?, NOW())",
     [
       productResult.insertId,
-      Number(input.stock ?? 0),
-      normalizeProductStatus(Number(input.stock ?? 0)),
+      stock,
+      normalizeProductStatus(stock),
     ],
   );
 
@@ -443,12 +467,28 @@ export async function updateProduct(
 ) {
   await ensureProductImageColumns();
 
+  const name = input.name.trim();
+  const description = input.description?.trim() || null;
+  const price = Number(input.price);
+  const stock = Number(input.stock);
+
+  if (!name) {
+    throw new Error("Product name is required.");
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Product price must be greater than zero.");
+  }
+
+  if (!Number.isInteger(stock) || stock < 0) {
+    throw new Error("Product stock must be a non-negative integer.");
+  }
+
   const subcategoryId = await ensureCategoryAndSubcategory(input.category, input.subcategory);
-  const subSubcategoryId = input.subSubcategory
+  const subSubcategoryId = input.subSubcategory?.trim()
     ? await ensureSubSubcategory(subcategoryId, input.subSubcategory)
     : null;
   const imageUrl = await saveProductImage(input.image);
-  const stock = Number(input.stock ?? 0);
   const connection = await dbPool.getConnection();
 
   try {
@@ -479,10 +519,10 @@ export async function updateProduct(
       [
         subcategoryId,
         subSubcategoryId,
-        input.name,
-        input.description ?? "",
+        name,
+        description,
         imageUrl,
-        Number(input.price ?? 0),
+        price,
         productId,
       ],
     );

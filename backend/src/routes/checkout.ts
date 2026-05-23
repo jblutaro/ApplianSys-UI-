@@ -102,7 +102,7 @@ checkoutRouter.post("/", async (req, res, next) => {
       }
     }
 
-    const paymentMethod = (body.paymentMethod ?? "Cash on Delivery").trim();
+    const paymentMethod = body.paymentMethod?.trim() ?? "";
     if (!paymentMethod) {
       res.status(400).json({ ok: false, message: "paymentMethod is required." });
       return;
@@ -125,7 +125,7 @@ checkoutRouter.post("/", async (req, res, next) => {
     });
 
     if (!result.ok) {
-      const statusCode = result.reason === "empty_cart" ? 400 : 409;
+      const statusCode = result.reason === "stock_error" ? 409 : 400;
       res.status(statusCode).json({ ok: false, message: result.message });
       return;
     }

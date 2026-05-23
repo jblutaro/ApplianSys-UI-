@@ -2,3 +2,15 @@
 [5/20/2026, 7:04:50 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_before_submit.png
 [5/20/2026, 7:04:51 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_after_login.png
 [5/20/2026, 7:04:51 PM] PASSED: User logged in and account menu appeared
+[5/20/2026, 9:27:51 PM] Login test started
+[5/20/2026, 9:27:55 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_before_submit.png
+[5/20/2026, 9:27:56 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_after_login.png
+[5/20/2026, 9:27:56 PM] PASSED: User logged in and account menu appeared
+[5/20/2026, 9:28:07 PM] Login test started
+[5/20/2026, 9:28:10 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_before_submit.png
+[5/20/2026, 9:28:11 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_after_login.png
+[5/20/2026, 9:28:11 PM] PASSED: User logged in and account menu appeared
+[5/20/2026, 9:28:20 PM] Login test started
+[5/20/2026, 9:28:22 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_before_submit.png
+[5/20/2026, 9:28:23 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\login_test_after_login.png
+[5/20/2026, 9:28:23 PM] PASSED: User logged in and account menu appeared

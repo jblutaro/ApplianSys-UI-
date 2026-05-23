@@ -727,6 +727,10 @@
   min-width: 260px;
 }
 
+.admin-inline-actions--compact {
+  min-width: 0;
+}
+
 .admin-release-filters {
   align-items: flex-end;
   flex-wrap: wrap;

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { OrderStatus, PickupReleaseOrder } from "../lib/adminApi";
+import type { PickupReleaseOrder } from "../lib/adminApi";
 import { formatCurrency, getStatusClass } from "../lib/adminUtils";
 
 type PickupReleaseSectionProps = {
@@ -9,10 +9,7 @@ type PickupReleaseSectionProps = {
     orderId: number,
     confirmPaymentReceived: boolean,
   ) => void;
-  onChangeStatus: (id: string, status: OrderStatus) => void;
 };
-
-const PICKUP_STATUS_OPTIONS: OrderStatus[] = ["pending", "preparing", "ready_for_pickup", "released", "cancelled"];
 
 function formatDateTime(value: string | null) {
   if (!value) return "Not available";
@@ -49,11 +46,15 @@ function isTerminalPickupStatus(status: string) {
   return status === "released" || status === "cancelled";
 }
 
+function canOpenRelease(order: PickupReleaseOrder) {
+  const status = order.orderStatus || order.pickupStatus;
+  return !isTerminalPickupStatus(status);
+}
+
 export function PickupReleaseSection({
   isReleasing,
   orders,
   onReleaseOrder,
-  onChangeStatus,
 }: PickupReleaseSectionProps) {
   const [query, setQuery] = useState("");
   const [pickupStatus, setPickupStatus] = useState("all");
@@ -204,29 +205,18 @@ export function PickupReleaseSection({
                     <td>{order.releasingOfficer || "Not released yet"}</td>
                     <td>{formatDateTime(order.releasedAt)}</td>
                     <td>
-                      <div className="admin-inline-actions">
-                        <select
-                          className="admin-select"
-                          value={status}
-                          disabled={isTerminalPickupStatus(status)}
-                          onChange={(event) => onChangeStatus(order.orderRef, event.target.value as OrderStatus)}
-                        >
-                          {PICKUP_STATUS_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {formatToken(option)}
-                            </option>
-                          ))}
-                        </select>
-                        {!isTerminalPickupStatus(status) ? (
+                      {canOpenRelease(order) ? (
+                        <div className="admin-inline-actions admin-inline-actions--compact">
                           <button
                             type="button"
                             className="admin-primary-btn admin-table-action-btn"
+                            disabled={isReleasing}
                             onClick={() => openReleaseModal(order)}
                           >
                             Release
                           </button>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -297,7 +287,7 @@ export function PickupReleaseSection({
                 disabled={!canReleaseSelected}
                 onClick={handleRelease}
               >
-                {isReleasing ? "Releasing..." : "Mark as Released"}
+                Release
               </button>
             </div>
           </div>

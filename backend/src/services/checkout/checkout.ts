@@ -200,9 +200,21 @@ export async function placeOrder(
   input: CheckoutInput,
 ): Promise<
   | { ok: true; order: PlacedOrder }
-  | { ok: false; reason: "empty_cart" | "stock_error"; message: string }
+  | { ok: false; reason: "empty_cart" | "invalid_customer" | "stock_error"; message: string }
 > {
   await ensureCheckoutSchema();
+
+  const [customerRows] = await dbPool.query<RowDataPacket[]>(
+    "SELECT user_id FROM CUSTOMER_USER WHERE user_id = ? LIMIT 1",
+    [userId],
+  );
+  if (!customerRows[0]) {
+    return {
+      ok: false,
+      reason: "invalid_customer",
+      message: "A valid customer account is required to place an order.",
+    };
+  }
 
   const cartItems = await getCartItems(userId);
   if (cartItems.length === 0) {

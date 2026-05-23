@@ -2,3 +2,7 @@
 [5/20/2026, 7:04:55 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\registration_validation_test_before_submit.png
 [5/20/2026, 7:04:55 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\registration_validation_test_validation_message.png
 [5/20/2026, 7:04:55 PM] PASSED: Password mismatch validation appeared
+[5/20/2026, 9:28:56 PM] Registration validation test started
+[5/20/2026, 9:28:59 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\registration_validation_test_before_submit.png
+[5/20/2026, 9:29:00 PM] Screenshot saved: C:\xampp\htdocs\React\ApplianSys\automated_tests\screenshots\registration_validation_test_validation_message.png
+[5/20/2026, 9:29:00 PM] PASSED: Password mismatch validation appeared
