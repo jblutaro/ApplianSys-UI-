@@ -9,6 +9,7 @@ import {
 } from "@/shared/lib/cartApi";
 import { isAdminUser } from "@/features/admin";
 import { CheckoutModal } from "@/shared/components/CheckoutModal";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import "@/shared/styles/Cart.css";
 
 type CartPageProps = {
@@ -47,7 +48,9 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [removeCandidate, setRemoveCandidate] = useState<CartItem | null>(null);
 
   const isCustomer = user && !isAdminUser(user);
 
@@ -61,6 +64,13 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
       try {
         const cartItems = await fetchCart();
         setItems(cartItems);
+        setSelectedIds(
+          new Set(
+            cartItems
+              .filter((item) => item.stock > 0 && item.status.toLowerCase() !== "out of stock")
+              .map((item) => item.productId),
+          ),
+        );
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to load cart.",
@@ -107,6 +117,11 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
     try {
       const updated = await removeFromCart(productId);
       setItems(updated);
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(productId);
+        return next;
+      });
     } catch {
       /* keep current state */
     } finally {
@@ -114,9 +129,39 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
     }
   };
 
+  const purchasableItems = items.filter(
+    (item) => item.stock > 0 && item.status.toLowerCase() !== "out of stock",
+  );
+  const selectedItems = items.filter((item) => selectedIds.has(item.productId));
+  const allPurchasableSelected =
+    purchasableItems.length > 0 &&
+    purchasableItems.every((item) => selectedIds.has(item.productId));
+  const somePurchasableSelected =
+    purchasableItems.some((item) => selectedIds.has(item.productId)) &&
+    !allPurchasableSelected;
+  const selectedTotalItems = selectedItems.reduce((n, i) => n + i.quantity, 0);
+  const selectedSubtotal = selectedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const selectedTotal = selectedSubtotal;
   const totalItems = items.reduce((n, i) => n + i.quantity, 0);
-  const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const total = subtotal;
+
+  const toggleItemSelection = (productId: number, selected: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(productId);
+      } else {
+        next.delete(productId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllPurchasable = (selected: boolean) => {
+    setSelectedIds(() => {
+      if (!selected) return new Set<number>();
+      return new Set(purchasableItems.map((item) => item.productId));
+    });
+  };
 
   /* ── Not signed in ── */
   if (!user) {
@@ -246,6 +291,18 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
           <div className="cart-items-panel">
             <div className="cart-items-panel__header">
               <span className="cart-items-panel__label">Your Items</span>
+              <label className="cart-items-panel__select-all">
+                <input
+                  type="checkbox"
+                  checked={allPurchasableSelected}
+                  ref={(input) => {
+                    if (input) input.indeterminate = somePurchasableSelected;
+                  }}
+                  disabled={purchasableItems.length === 0}
+                  onChange={(event) => toggleAllPurchasable(event.target.checked)}
+                />
+                Select all available
+              </label>
             </div>
 
             <ul role="list" style={{ margin: 0, padding: 0, listStyle: "none" }}>
@@ -253,6 +310,7 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
                 const isPending = pendingIds.has(item.productId);
                 const isOutOfStock =
                   item.stock === 0 || item.status.toLowerCase() === "out of stock";
+                const isSelected = selectedIds.has(item.productId);
                 const isLowStock = !isOutOfStock && item.stock <= 5;
                 const productPath = `/product/PRD-${String(item.productId).padStart(3, "0")}`;
 
@@ -261,6 +319,15 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
                     key={item.productId}
                     className={`cart-item${isPending ? " cart-item--pending" : ""}`}
                   >
+                    <label className="cart-item__select" aria-label={`Select ${item.productName}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isOutOfStock || isPending}
+                        onChange={(event) => toggleItemSelection(item.productId, event.target.checked)}
+                      />
+                    </label>
+
                     {/* Image */}
                     <Link to={productPath} className="cart-item__img" tabIndex={-1} aria-hidden>
                       {item.imageUrl ? (
@@ -328,7 +395,7 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
                         className="cart-item__remove"
                         aria-label={`Remove ${item.productName}`}
                         disabled={isPending}
-                        onClick={() => void handleRemove(item.productId)}
+                        onClick={() => setRemoveCandidate(item)}
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                           <polyline points="3 6 5 6 21 6" />
@@ -353,8 +420,10 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
 
             <div className="cart-summary__rows">
               <div className="cart-summary__row">
-                <span>Subtotal ({totalItems} item{totalItems !== 1 ? "s" : ""})</span>
-                <span className="cart-summary__row-val">{formatCurrency(subtotal)}</span>
+                <span>
+                  Selected ({selectedTotalItems} item{selectedTotalItems !== 1 ? "s" : ""})
+                </span>
+                <span className="cart-summary__row-val">{formatCurrency(selectedSubtotal)}</span>
               </div>
               <div className="cart-summary__row">
                 <span>Shipping</span>
@@ -362,13 +431,14 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
               </div>
               <div className="cart-summary__row cart-summary__row--total">
                 <span>Total</span>
-                <span className="cart-summary__row-val">{formatCurrency(total)}</span>
+                <span className="cart-summary__row-val">{formatCurrency(selectedTotal)}</span>
               </div>
             </div>
 
             <button
               type="button"
               className="cart-summary__checkout"
+              disabled={selectedItems.length === 0}
               onClick={() => setCheckoutOpen(true)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -377,7 +447,7 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
                 <circle cx="5.5" cy="18.5" r="2.5" />
                 <circle cx="18.5" cy="18.5" r="2.5" />
               </svg>
-              Proceed to Checkout
+              {selectedItems.length === 0 ? "Select Items to Checkout" : "Proceed to Checkout"}
             </button>
 
             <Link to="/" className="cart-summary__continue">
@@ -433,13 +503,34 @@ function CartPage({ user, onAuthOpen }: CartPageProps) {
 
       {checkoutOpen ? (
         <CheckoutModal
-          items={items}
+          items={selectedItems}
           onClose={() => setCheckoutOpen(false)}
           onSuccess={() => {
-            setItems([]);
+            setItems((current) => current.filter((item) => !selectedIds.has(item.productId)));
+            setSelectedIds(new Set());
           }}
         />
       ) : null}
+
+      <ConfirmationModal
+        open={Boolean(removeCandidate)}
+        title="Remove item from cart?"
+        message={
+          removeCandidate
+            ? `${removeCandidate.productName} will be removed from your cart. You can add it again from the product page.`
+            : ""
+        }
+        confirmLabel="Remove Item"
+        variant="danger"
+        isBusy={removeCandidate ? pendingIds.has(removeCandidate.productId) : false}
+        onCancel={() => setRemoveCandidate(null)}
+        onConfirm={() => {
+          if (!removeCandidate) return;
+          const productId = removeCandidate.productId;
+          setRemoveCandidate(null);
+          void handleRemove(productId);
+        }}
+      />
     </div>
   );
 }

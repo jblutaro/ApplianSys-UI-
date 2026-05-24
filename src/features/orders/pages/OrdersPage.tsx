@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAdminUser } from "@/features/admin";
 import type { AppUser } from "@/shared/lib/auth";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import { cancelOrder, fetchOrders, type CustomerOrder } from "@/shared/lib/ordersApi";
 import "@/shared/styles/Orders.css";
 
@@ -124,6 +125,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const [cancelCandidate, setCancelCandidate] = useState<CustomerOrder | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -371,7 +373,7 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
                         type="button"
                         className="order-card__btn order-card__btn--danger"
                         disabled={cancellingOrderId === order.dbId}
-                        onClick={() => handleCancelOrder(order)}
+                        onClick={() => setCancelCandidate(order)}
                       >
                         {cancellingOrderId === order.dbId ? "Cancelling..." : "Cancel Order"}
                       </button>
@@ -402,6 +404,25 @@ function OrdersPage({ onAuthOpen, user }: OrdersPageProps) {
           ))}
         </div>
       )}
+      <ConfirmationModal
+        open={Boolean(cancelCandidate)}
+        title="Cancel this order?"
+        message={
+          cancelCandidate
+            ? `Order ${cancelCandidate.id} will be cancelled and its reserved items will be returned to inventory. This cannot be undone from your account.`
+            : ""
+        }
+        confirmLabel="Cancel Order"
+        variant="danger"
+        isBusy={cancelCandidate ? cancellingOrderId === cancelCandidate.dbId : false}
+        onCancel={() => setCancelCandidate(null)}
+        onConfirm={() => {
+          if (!cancelCandidate) return;
+          const order = cancelCandidate;
+          setCancelCandidate(null);
+          handleCancelOrder(order);
+        }}
+      />
     </div>
   );
 }

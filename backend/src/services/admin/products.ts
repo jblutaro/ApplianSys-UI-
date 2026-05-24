@@ -8,11 +8,82 @@ import type { AdminCategoryOption, AdminProduct } from "./types.js";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const productUploadDir = path.join(backendRoot, "uploads", "products");
+const MAX_PRODUCT_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_PRODUCT_IMAGE_DIMENSION = 4096;
 
 function normalizeProductStatus(stock: number) {
   if (stock <= 0) return "Out of Stock";
   if (stock < 15) return "Low Stock";
   return "Active";
+}
+
+function readJpegDimensions(buffer: Buffer) {
+  let offset = 2;
+
+  while (offset < buffer.length) {
+    if (buffer[offset] !== 0xff) return null;
+    const marker = buffer[offset + 1];
+    const length = buffer.readUInt16BE(offset + 2);
+
+    if ([0xc0, 0xc1, 0xc2, 0xc3].includes(marker)) {
+      return {
+        height: buffer.readUInt16BE(offset + 5),
+        width: buffer.readUInt16BE(offset + 7),
+      };
+    }
+
+    offset += 2 + length;
+  }
+
+  return null;
+}
+
+function readImageDimensions(extension: string, buffer: Buffer) {
+  if (extension === "png" && buffer.length >= 24) {
+    return {
+      width: buffer.readUInt32BE(16),
+      height: buffer.readUInt32BE(20),
+    };
+  }
+
+  if (extension === "gif" && buffer.length >= 10) {
+    return {
+      width: buffer.readUInt16LE(6),
+      height: buffer.readUInt16LE(8),
+    };
+  }
+
+  if (extension === "webp" && buffer.length >= 30) {
+    if (buffer.subarray(12, 16).toString("ascii") === "VP8X") {
+      return {
+        width: buffer.readUIntLE(24, 3) + 1,
+        height: buffer.readUIntLE(27, 3) + 1,
+      };
+    }
+  }
+
+  if (extension === "jpg") {
+    return readJpegDimensions(buffer);
+  }
+
+  return null;
+}
+
+function assertSafeImageDimensions(extension: string, buffer: Buffer) {
+  const dimensions = readImageDimensions(extension, buffer);
+
+  if (!dimensions) {
+    throw new Error("Product photo dimensions could not be verified.");
+  }
+
+  if (
+    dimensions.width <= 0 ||
+    dimensions.height <= 0 ||
+    dimensions.width > MAX_PRODUCT_IMAGE_DIMENSION ||
+    dimensions.height > MAX_PRODUCT_IMAGE_DIMENSION
+  ) {
+    throw new Error(`Product photo dimensions must be ${MAX_PRODUCT_IMAGE_DIMENSION}px or smaller.`);
+  }
 }
 
 let productImageColumnsReady = false;
@@ -56,9 +127,27 @@ async function saveProductImage(input: string | undefined) {
   }
 
   const extension = match[1].toLowerCase() === "jpeg" ? "jpg" : match[1].toLowerCase();
+  const imageBuffer = Buffer.from(match[2], "base64");
+
+  if (imageBuffer.length > MAX_PRODUCT_IMAGE_BYTES) {
+    throw new Error("Product photo must be 2 MB or smaller.");
+  }
+
+  const signatures: Record<string, (buffer: Buffer) => boolean> = {
+    gif: (buffer) => buffer.subarray(0, 6).toString("ascii") === "GIF87a" || buffer.subarray(0, 6).toString("ascii") === "GIF89a",
+    jpg: (buffer) => buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[buffer.length - 2] === 0xff && buffer[buffer.length - 1] === 0xd9,
+    png: (buffer) => buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    webp: (buffer) => buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP",
+  };
+
+  if (!signatures[extension]?.(imageBuffer)) {
+    throw new Error("Product photo content does not match the declared image type.");
+  }
+  assertSafeImageDimensions(extension, imageBuffer);
+
   const filename = `${Date.now()}-${randomUUID()}.${extension}`;
   await mkdir(productUploadDir, { recursive: true });
-  await writeFile(path.join(productUploadDir, filename), Buffer.from(match[2], "base64"));
+  await writeFile(path.join(productUploadDir, filename), imageBuffer);
   return `/api/uploads/products/${filename}`;
 }
 

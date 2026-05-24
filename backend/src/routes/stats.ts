@@ -36,6 +36,7 @@ statsRouter.get("/stats", async (_req, res, next) => {
 
     const currentYear = new Date().getFullYear();
 
+    res.setHeader("Cache-Control", "public, max-age=60");
     res.json({
       ok: true,
       stats: {
@@ -85,6 +86,7 @@ statsRouter.get("/best-selling", async (_req, res, next) => {
       totalSold: Number(row.total_sold),
     }));
 
+    res.setHeader("Cache-Control", "public, max-age=60");
     res.json({
       ok: true,
       products: bestSelling,

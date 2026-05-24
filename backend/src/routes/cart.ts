@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { readSession } from "../auth/session.js";
 import { findUserById, isActiveStatus, isStaffOrAdminUser } from "../auth/users.js";
+import { parseNonNegativeInteger, parsePositiveInteger } from "../security/validation.js";
 import {
   getCartItems,
   removeCartItem,
@@ -12,7 +13,7 @@ export const cartRouter = Router();
 
 /** Resolve the authenticated customer user_id from the session, or return null. */
 async function resolveCustomerUserId(req: Parameters<typeof readSession>[0]): Promise<number | null> {
-  const session = readSession(req);
+  const session = await readSession(req);
   if (!session) return null;
 
   const user = await findUserById(session.userId);
@@ -54,20 +55,18 @@ cartRouter.post("/items", async (req, res, next) => {
       quantity?: unknown;
     };
 
-    const parsedProductId = Number(productId);
-    const parsedQuantity = Number(quantity ?? 1);
+    const parsedProductId = parsePositiveInteger(productId, "productId");
+    const parsedQuantity = parsePositiveInteger(quantity ?? 1, "quantity");
 
-    if (!parsedProductId || parsedProductId <= 0) {
-      res.status(400).json({ ok: false, message: "A valid productId is required." });
+    if (!parsedProductId.ok || !parsedQuantity.ok) {
+      res.status(400).json({
+        ok: false,
+        message: !parsedProductId.ok ? parsedProductId.message : parsedQuantity.message,
+      });
       return;
     }
 
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
-      res.status(400).json({ ok: false, message: "quantity must be a positive integer." });
-      return;
-    }
-
-    const result = await upsertCartItem(userId, parsedProductId, parsedQuantity);
+    const result = await upsertCartItem(userId, parsedProductId.value, parsedQuantity.value);
 
     if (!result.ok) {
       const statusMap = {
@@ -101,21 +100,19 @@ cartRouter.patch("/items/:productId", async (req, res, next) => {
       return;
     }
 
-    const parsedProductId = Number(req.params.productId);
+    const parsedProductId = parsePositiveInteger(req.params.productId, "productId");
     const { quantity } = req.body as { quantity?: unknown };
-    const parsedQuantity = Number(quantity);
+    const parsedQuantity = parseNonNegativeInteger(quantity, "quantity");
 
-    if (!parsedProductId || parsedProductId <= 0) {
-      res.status(400).json({ ok: false, message: "Invalid productId." });
+    if (!parsedProductId.ok || !parsedQuantity.ok) {
+      res.status(400).json({
+        ok: false,
+        message: !parsedProductId.ok ? parsedProductId.message : parsedQuantity.message,
+      });
       return;
     }
 
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-      res.status(400).json({ ok: false, message: "quantity must be a non-negative integer." });
-      return;
-    }
-
-    const result = await updateCartItemQuantity(userId, parsedProductId, parsedQuantity);
+    const result = await updateCartItemQuantity(userId, parsedProductId.value, parsedQuantity.value);
 
     if (!result.ok) {
       const statusMap = { not_found: 404, stock_exceeded: 409 } as const;
@@ -143,13 +140,13 @@ cartRouter.delete("/items/:productId", async (req, res, next) => {
       return;
     }
 
-    const parsedProductId = Number(req.params.productId);
-    if (!parsedProductId || parsedProductId <= 0) {
-      res.status(400).json({ ok: false, message: "Invalid productId." });
+    const parsedProductId = parsePositiveInteger(req.params.productId, "productId");
+    if (!parsedProductId.ok) {
+      res.status(400).json({ ok: false, message: parsedProductId.message });
       return;
     }
 
-    const items = await removeCartItem(userId, parsedProductId);
+    const items = await removeCartItem(userId, parsedProductId.value);
     res.json({ ok: true, items });
   } catch (error) {
     next(error);

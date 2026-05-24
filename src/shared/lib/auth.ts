@@ -133,3 +133,11 @@ export async function signOutUser(): Promise<void> {
 
   emit(null);
 }
+
+export async function revokeAllUserSessions(): Promise<void> {
+  await requestJson<{ ok: true }>("/api/auth/sessions/revoke-all", {
+    method: "POST",
+  });
+
+  emit(null);
+}

@@ -4,7 +4,7 @@ import { findUserById, isActiveStatus, isStaffOrAdminUser } from "./users.js";
 
 export async function requireAuthenticated(req: Request, res: Response, next: NextFunction) {
   try {
-    const session = readSession(req);
+    const session = await readSession(req);
     if (!session) {
       res.status(401).json({ ok: false, message: "Authentication required." });
       return;
@@ -12,7 +12,7 @@ export async function requireAuthenticated(req: Request, res: Response, next: Ne
 
     const user = await findUserById(session.userId);
     if (!user || !isActiveStatus(user.status)) {
-      clearSession(req, res);
+      await clearSession(req, res);
       res.status(401).json({ ok: false, message: "Authentication required." });
       return;
     }
@@ -25,7 +25,7 @@ export async function requireAuthenticated(req: Request, res: Response, next: Ne
 
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   try {
-    const session = readSession(req);
+    const session = await readSession(req);
     if (!session) {
       res.status(401).json({ ok: false, message: "Authentication required." });
       return;
@@ -33,7 +33,7 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
 
     const user = await findUserById(session.userId);
     if (!user || !isActiveStatus(user.status)) {
-      clearSession(req, res);
+      await clearSession(req, res);
       res.status(401).json({ ok: false, message: "Authentication required." });
       return;
     }

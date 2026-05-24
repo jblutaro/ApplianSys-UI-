@@ -141,6 +141,7 @@ export default function MockGcashPage() {
       const order = await submitCheckout({
         fulfillment: session.fulfillment,
         paymentMethod: "GCash",
+        productIds: session.productIds,
       });
       const nextReceiptRef = generateReceiptRef();
       const nextPaidAt = new Date();

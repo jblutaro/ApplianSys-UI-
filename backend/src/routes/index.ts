@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAdmin, requireAuthenticated } from "../auth/middleware.js";
+import { env } from "../config/env.js";
 import { testDatabaseConnection } from "../config/database.js";
 import { adminRouter } from "./admin.js";
 import { authRouter } from "./auth.js";
@@ -19,17 +20,19 @@ apiRouter.get("/health", (_req, res) => {
   });
 });
 
-apiRouter.get("/db-test", async (_req, res, next) => {
-  try {
-    const result = await testDatabaseConnection();
-    res.json({
-      ok: true,
-      database: result,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+if (env.enableDbTestRoute) {
+  apiRouter.get("/db-test", async (_req, res, next) => {
+    try {
+      const result = await testDatabaseConnection();
+      res.json({
+        ok: true,
+        database: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+}
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/chat", chatRouter);

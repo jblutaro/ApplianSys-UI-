@@ -8,8 +8,10 @@ export const dbPool = mysql.createPool({
   password: env.dbPassword,
   database: env.dbName,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  connectionLimit: env.dbConnectionLimit,
+  queueLimit: 100,
+  maxIdle: Math.max(1, Math.floor(env.dbConnectionLimit / 2)),
+  idleTimeout: 60_000,
 });
 
 export async function testDatabaseConnection() {

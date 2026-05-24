@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { generateAccountId } from "./accountId.js";
 import { dbPool } from "../config/database.js";
 import { env } from "../config/env.js";
+import { decryptField, encryptField } from "../security/fieldEncryption.js";
 import type { AuthSource } from "./session.js";
 
 export type AuthUserRow = RowDataPacket & {
@@ -60,7 +61,7 @@ export function isActiveStatus(status: string | null | undefined) {
 export function isAdminEmail(email: string) {
   const normalizedEmail = normalizeEmail(email);
   const envAdmins = parseAdminEmails(env.adminEmails);
-  return envAdmins.includes(normalizedEmail) || normalizedEmail.startsWith("admin");
+  return envAdmins.includes(normalizedEmail);
 }
 
 export function isStaffUser(user: Pick<AuthUserRow, "user_type">) {
@@ -102,10 +103,32 @@ function normalizeDateValue(value: Date | string | null | undefined) {
   return new Date(value).toISOString();
 }
 
+let encryptedUserColumnsReady = false;
+
+async function ensureEncryptedUserColumns() {
+  if (encryptedUserColumnsReady) return;
+
+  const [rows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT DATA_TYPE
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'USER'
+       AND COLUMN_NAME = 'contact_num'
+     LIMIT 1`,
+  );
+
+  const dataType = String(rows[0]?.DATA_TYPE ?? "").toLowerCase();
+  if (dataType && dataType !== "text" && dataType !== "longtext" && dataType !== "mediumtext") {
+    await dbPool.query("ALTER TABLE `USER` MODIFY contact_num TEXT NULL");
+  }
+
+  encryptedUserColumnsReady = true;
+}
+
 export function mapAccountProfile(user: AuthUserProfileRow) {
   return {
     accountId: user.account_id,
-    contactNumber: user.contact_num ?? "",
+    contactNumber: decryptField(user.contact_num),
     createdAt: normalizeDateValue(user.created_at),
     displayName: buildDisplayName(user),
     email: user.email,
@@ -143,6 +166,8 @@ export async function findUserById(userId: number): Promise<AuthUserRow | null> 
 }
 
 export async function listStaffAndAdminUsers() {
+  await ensureEncryptedUserColumns();
+
   const [rows] = await dbPool.query<AuthUserProfileRow[]>(
     `SELECT user_id, account_id, fname, mname, lname, email, contact_num, status, created_at, last_login, user_type
      FROM \`USER\`
@@ -161,6 +186,8 @@ export async function listStaffAndAdminUsers() {
 }
 
 export async function findUserProfileById(userId: number): Promise<AuthUserProfileRow | null> {
+  await ensureEncryptedUserColumns();
+
   const [rows] = await dbPool.query<AuthUserProfileRow[]>(
     `SELECT user_id, account_id, fname, mname, lname, email, contact_num, status, created_at, last_login, user_type
      FROM \`USER\`
@@ -194,6 +221,7 @@ export async function createLocalUser(
 
   let userId = 0;
   try {
+    await ensureEncryptedUserColumns();
     await connection.beginTransaction();
 
     const [result] = await connection.query<ResultSetHeader>(
@@ -207,7 +235,7 @@ export async function createLocalUser(
         lastName,
         normalizedEmail,
         passwordHash,
-        contactNumber || null,
+        encryptField(contactNumber),
         "Active",
         userType,
       ],
@@ -259,6 +287,8 @@ export async function updateUserProfile(
     middleName: string;
   },
 ) {
+  await ensureEncryptedUserColumns();
+
   await dbPool.query(
     `UPDATE \`USER\`
      SET fname = ?, mname = ?, lname = ?, contact_num = ?
@@ -267,7 +297,7 @@ export async function updateUserProfile(
       profile.firstName,
       profile.middleName,
       profile.lastName,
-      profile.contactNumber,
+      encryptField(profile.contactNumber),
       userId,
     ],
   );

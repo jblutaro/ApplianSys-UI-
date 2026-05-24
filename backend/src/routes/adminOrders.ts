@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { readSession } from "../auth/session.js";
 import { findUserById, isActiveStatus, isStaffOrAdminUser } from "../auth/users.js";
+import { logAuditEvent } from "../services/audit/auditLog.js";
 import { getOrders, updateOrderStatus } from "../services/admin/orders.js";
 import { getPendingPickupReleaseOrders, releasePickupOrder } from "../services/admin/pickupRelease.js";
 
 export const adminOrdersRouter = Router();
 
 async function resolveReleasingOfficerId(req: Parameters<typeof readSession>[0]) {
-  const session = readSession(req);
+  const session = await readSession(req);
   if (!session) return null;
   const user = await findUserById(session.userId);
   if (!user || !isActiveStatus(user.status) || !isStaffOrAdminUser(user)) return null;
@@ -34,6 +35,13 @@ adminOrdersRouter.patch("/orders/:orderId/status", async (req, res, next) => {
     }
 
     const orders = await updateOrderStatus(orderId, status);
+    await logAuditEvent({
+      action: "admin.order.status_update",
+      details: { status },
+      entityId: orderId,
+      entityType: "order",
+      req,
+    });
     res.json({ ok: true, orders });
   } catch (error) {
     if (
@@ -85,6 +93,14 @@ adminOrdersRouter.post("/pickup-releases/:orderId/release", async (req, res, nex
     }
 
     const orders = await getPendingPickupReleaseOrders();
+    await logAuditEvent({
+      action: "admin.pickup.release",
+      actorId: sessionOfficerId,
+      details: { confirmPaymentReceived: Boolean(confirmPaymentReceived) },
+      entityId: orderId,
+      entityType: "order",
+      req,
+    });
     res.json({ ok: true, orders });
   } catch (error) {
     next(error);

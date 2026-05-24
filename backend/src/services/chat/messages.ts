@@ -1,5 +1,9 @@
 import type { ChatMessage, OpenAIMessage } from "./types.js";
 
+const MAX_CHAT_HISTORY = 20;
+const MAX_CHAT_MESSAGE_LENGTH = 1_000;
+const MAX_CHAT_PAYLOAD_LENGTH = 6_000;
+
 const SYSTEM_PROMPT =
   `Create an intelligent ecommerce comparison chatbot feature that helps users compare products side-by-side before purchasing.
 
@@ -100,6 +104,7 @@ function isUnknownArray(value: unknown): value is unknown[] {
 export function isChatMessageArray(value: unknown): value is ChatMessage[] {
   return (
     Array.isArray(value) &&
+    value.length <= MAX_CHAT_HISTORY &&
     value.every(
       (item) =>
         item &&
@@ -108,8 +113,11 @@ export function isChatMessageArray(value: unknown): value is ChatMessage[] {
         "text" in item &&
         ((item as { role?: unknown }).role === "user" ||
           (item as { role?: unknown }).role === "assistant") &&
-        typeof (item as { text?: unknown }).text === "string",
-    )
+        typeof (item as { text?: unknown }).text === "string" &&
+        (item as { text: string }).text.trim().length > 0 &&
+        (item as { text: string }).text.length <= MAX_CHAT_MESSAGE_LENGTH,
+    ) &&
+    value.reduce((total, item) => total + item.text.length, 0) <= MAX_CHAT_PAYLOAD_LENGTH
   );
 }
 

@@ -1,6 +1,7 @@
 import { Router, type Request } from "express";
 import { readSession } from "../auth/session.js";
 import { findUserById, isAdminUser } from "../auth/users.js";
+import { logAuditEvent } from "../services/audit/auditLog.js";
 import {
   createCategoryWithSubcategory,
   createProduct,
@@ -17,7 +18,7 @@ import {
 export const adminProductsRouter = Router();
 
 async function requireAdminActor(req: Request) {
-  const session = readSession(req);
+  const session = await readSession(req);
   const user = session ? await findUserById(session.userId) : null;
   return user && isAdminUser(user) ? user : null;
 }
@@ -117,6 +118,12 @@ adminProductsRouter.post("/categories", async (req, res, next) => {
       categoryName: categoryName.trim(),
       subcategoryName: subcategoryName.trim(),
     });
+    await logAuditEvent({
+      action: "admin.category.create",
+      details: { categoryName: categoryName.trim(), subcategoryName: subcategoryName.trim() },
+      entityType: "category",
+      req,
+    });
 
     res.status(201).json({ ok: true, categories });
   } catch (error) {
@@ -159,6 +166,13 @@ adminProductsRouter.post("/subcategories/:subcategoryId/sub-subcategories", asyn
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.sub_subcategory.create",
+      details: { subSubcategoryName: subSubcategoryName.trim(), subcategoryId },
+      entityId: subcategoryId,
+      entityType: "subcategory",
+      req,
+    });
     res.status(201).json({ ok: true, categories: result.categories });
   } catch (error) {
     next(error);
@@ -196,6 +210,12 @@ adminProductsRouter.delete("/categories/:categoryId", async (req, res, next) => 
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.category.delete",
+      entityId: categoryId,
+      entityType: "category",
+      req,
+    });
     res.json({ ok: true, categories: result.categories });
   } catch (error) {
     next(error);
@@ -233,6 +253,12 @@ adminProductsRouter.delete("/subcategories/:subcategoryId", async (req, res, nex
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.subcategory.delete",
+      entityId: subcategoryId,
+      entityType: "subcategory",
+      req,
+    });
     res.json({ ok: true, categories: result.categories });
   } catch (error) {
     next(error);
@@ -270,6 +296,12 @@ adminProductsRouter.delete("/sub-subcategories/:subSubcategoryId", async (req, r
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.sub_subcategory.delete",
+      entityId: subSubcategoryId,
+      entityType: "sub_subcategory",
+      req,
+    });
     res.json({ ok: true, categories: result.categories });
   } catch (error) {
     next(error);
@@ -285,6 +317,17 @@ adminProductsRouter.post("/products", async (req, res, next) => {
     }
 
     const products = await createProduct(payload.product);
+    await logAuditEvent({
+      action: "admin.product.create",
+      details: {
+        category: payload.product.category,
+        name: payload.product.name,
+        price: payload.product.price,
+        stock: payload.product.stock,
+      },
+      entityType: "product",
+      req,
+    });
     res.status(201).json({ ok: true, products });
   } catch (error) {
     next(error);
@@ -313,6 +356,18 @@ adminProductsRouter.put("/products/:productId", async (req, res, next) => {
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.product.update",
+      details: {
+        category: payload.product.category,
+        name: payload.product.name,
+        price: payload.product.price,
+        stock: payload.product.stock,
+      },
+      entityId: productId,
+      entityType: "product",
+      req,
+    });
     res.json({ ok: true, products: result.products });
   } catch (error) {
     next(error);
@@ -343,6 +398,12 @@ adminProductsRouter.delete("/products/:productId", async (req, res, next) => {
       return;
     }
 
+    await logAuditEvent({
+      action: "admin.product.delete",
+      entityId: productId,
+      entityType: "product",
+      req,
+    });
     res.json({ ok: true, products: result.products });
   } catch (error) {
     next(error);

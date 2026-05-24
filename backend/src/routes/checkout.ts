@@ -6,6 +6,8 @@ import { readAdminSettings } from "../data/adminSettingsStore.js";
 import { dbPool } from "../config/database.js";
 import { OLD_ALBAY_SHOP_LOCATION, placeOrder } from "../services/checkout/checkout.js";
 import type { CheckoutInput } from "../services/checkout/checkout.js";
+import { recordPaymentConfirmation } from "../services/payments/paymentConfirmations.js";
+import { parseBoundedString, parsePositiveInteger } from "../security/validation.js";
 
 export const checkoutRouter = Router();
 
@@ -56,7 +58,7 @@ function normalizePaymentMethod(method: string) {
 async function resolveCustomerUserId(
   req: Parameters<typeof readSession>[0],
 ): Promise<number | null> {
-  const session = readSession(req);
+  const session = await readSession(req);
   if (!session) return null;
   const user = await findUserById(session.userId);
   if (!user || !isActiveStatus(user.status)) return null;
@@ -91,8 +93,16 @@ checkoutRouter.post("/", async (req, res, next) => {
 
     if (fulfillment.method === "delivery") {
       const { street, barangay, city, province, latitude, longitude } = fulfillment;
-      if (!street?.trim() || !barangay?.trim() || !city?.trim() || !province?.trim()) {
-        res.status(400).json({ ok: false, message: "Street, barangay, city, and province are required for delivery." });
+      const fields = [
+        parseBoundedString(street, "street", { maxLength: 120, required: true }),
+        parseBoundedString(barangay, "barangay", { maxLength: 80, required: true }),
+        parseBoundedString(city, "city", { maxLength: 80, required: true }),
+        parseBoundedString(province, "province", { maxLength: 80, required: true }),
+      ];
+      const invalidField = fields.find((field) => !field.ok);
+
+      if (invalidField && !invalidField.ok) {
+        res.status(400).json({ ok: false, message: invalidField.message });
         return;
       }
 
@@ -119,9 +129,22 @@ checkoutRouter.post("/", async (req, res, next) => {
       return;
     }
 
+    const productIds = Array.isArray(body.productIds)
+      ? body.productIds
+          .map((productId) => parsePositiveInteger(productId, "productId"))
+          .filter((productId): productId is { ok: true; value: number } => productId.ok)
+          .map((productId) => productId.value)
+      : undefined;
+
+    if (Array.isArray(body.productIds) && productIds?.length !== body.productIds.length) {
+      res.status(400).json({ ok: false, message: "All selected product IDs must be positive integers." });
+      return;
+    }
+
     const result = await placeOrder(userId, {
       fulfillment,
       paymentMethod: normalizedPaymentMethod,
+      productIds,
     });
 
     if (!result.ok) {
@@ -164,10 +187,17 @@ checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
       paidAt?: unknown;
       receiptNumber?: unknown;
     };
-    const parsedOrderId = Number(orderId);
+    const parsedOrderId = parsePositiveInteger(orderId, "orderId");
+    const parsedReceiptNumber = parseBoundedString(receiptNumber, "receiptNumber", {
+      maxLength: 120,
+      required: true,
+    });
 
-    if (!Number.isInteger(parsedOrderId) || parsedOrderId <= 0 || typeof receiptNumber !== "string") {
-      res.status(400).json({ ok: false, message: "orderId and receiptNumber are required." });
+    if (!parsedOrderId.ok || !parsedReceiptNumber.ok) {
+      res.status(400).json({
+        ok: false,
+        message: !parsedOrderId.ok ? parsedOrderId.message : parsedReceiptNumber.message,
+      });
       return;
     }
 
@@ -192,7 +222,7 @@ checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
       WHERE o.order_id = ? AND o.user_id = ?
       ORDER BY oi.product_id ASC
       `,
-      [parsedOrderId, userId],
+      [parsedOrderId.value, userId],
     );
 
     if (rows.length === 0) {
@@ -203,6 +233,31 @@ checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
     const first = rows[0];
     const customerName = [first.fname, first.lname].filter(Boolean).join(" ") || first.email;
     const paymentDate = typeof paidAt === "string" ? new Date(paidAt) : new Date();
+    if (Number.isNaN(paymentDate.getTime())) {
+      res.status(400).json({ ok: false, message: "paidAt must be a valid date." });
+      return;
+    }
+
+    const confirmation = await recordPaymentConfirmation({
+      amountPaid: Number(first.total_amount),
+      orderId: parsedOrderId.value,
+      paidAt: paymentDate,
+      paymentMethod: "gcash",
+      payload: {
+        orderId: parsedOrderId.value,
+        paidAt: paymentDate.toISOString(),
+        receiptNumber: parsedReceiptNumber.value,
+      },
+      receiptNumber: parsedReceiptNumber.value,
+      source: "mock_gcash",
+      userId,
+    });
+
+    if (!confirmation.ok) {
+      res.status(409).json({ ok: false, message: "This receipt number has already been recorded." });
+      return;
+    }
+
     const orderRef = `ORD-${String(first.order_id).padStart(4, "0")}`;
     const currency = new Intl.NumberFormat("en-PH", { currency: "PHP", style: "currency" });
     const items = rows.map((row) => ({
@@ -217,7 +272,7 @@ checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
       `To: ${first.email}`,
       `Customer: ${customerName}`,
       `Order Reference: ${orderRef}`,
-      `Receipt Number: ${receiptNumber}`,
+      `Receipt Number: ${parsedReceiptNumber.value}`,
       `Payment Method: Mock GCash`,
       `Amount Paid: ${currency.format(Number(first.total_amount))}`,
       `Date and Time Paid: ${paymentDate.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}`,
@@ -235,7 +290,7 @@ checkoutRouter.post("/mock-gcash/email", async (req, res, next) => {
       ok: true,
       delivered: false,
       mode: "console-fallback",
-      message: "Mock confirmation email logged to backend console.",
+      message: "Mock confirmation email logged and payment confirmation recorded.",
     });
   } catch (error) {
     next(error);

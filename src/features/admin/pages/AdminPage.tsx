@@ -2,6 +2,7 @@ import "@/shared/styles/Admin.css";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { AppUser } from "@/shared/lib/auth";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import { AdminAccessState } from "../components/AdminAccessState";
 import { AdminAccountSection } from "../components/AdminAccountSection";
 import { CategoryManagerModal } from "../components/CategoryManagerModal";
@@ -108,7 +109,8 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const isAllowed = isAdminUser(user);
 
-  const state = useAdminDashboard({    enabled: Boolean(user && isAllowed),
+  const state = useAdminDashboard({
+    enabled: Boolean(user && isAllowed),
   });
   const navItems = user ? getNavItems(user) : NAV_ITEMS;
   const section = getSection(searchParams.get("section"), navItems);
@@ -159,122 +161,139 @@ function AdminPage({ user, onAuthOpen }: AdminPageProps) {
   }
 
   return (
-    <div className="admin-shell">
-      <aside className="admin-sidebar">
-        <div className="admin-sidebar__top">
-          <div className="admin-brand">
-            <div className="admin-brand__row">
-              <h1 className="admin-brand__title">ApplianSys Panel</h1>
+    <>
+      <div className="admin-shell">
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar__top">
+            <div className="admin-brand">
+              <div className="admin-brand__row">
+                <h1 className="admin-brand__title">ApplianSys Panel</h1>
+              </div>
             </div>
+
+            <nav className="admin-sidebar__nav">
+              {navItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`admin-sidebar__link${section === item.key ? " admin-sidebar__link--active" : ""}`}
+                  onClick={() => setSearchParams({ section: item.key })}
+                  title={item.label}
+                >
+                  <span className="admin-sidebar__link-label">{item.label}</span>
+                </button>
+              ))}
+            </nav>
           </div>
 
-          <nav className="admin-sidebar__nav">
-            {navItems.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={`admin-sidebar__link${section === item.key ? " admin-sidebar__link--active" : ""}`}
-                onClick={() => setSearchParams({ section: item.key })}
-                title={item.label}
-              >
-                <span className="admin-sidebar__link-label">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
+          <div className="admin-sidebar__footer">
+            <div className="admin-sidebar__user">
+              <span className="admin-sidebar__user-label">Signed in as</span>
+              <span className="admin-sidebar__user-value">{user.email}</span>
+            </div>
 
-        <div className="admin-sidebar__footer">
-          <div className="admin-sidebar__user">
-            <span className="admin-sidebar__user-label">Signed in as</span>
-            <span className="admin-sidebar__user-value">{user.email}</span>
+            <Link to="/" className="admin-sidebar__back" title="Back to Storefront">
+              <span className="admin-sidebar__link-label">Back to Storefront</span>
+            </Link>
           </div>
+        </aside>
 
-          <Link to="/" className="admin-sidebar__back" title="Back to Storefront">
-            <span className="admin-sidebar__link-label">Back to Storefront</span>
-          </Link>
-        </div>
-      </aside>
+        <main className="admin-content">
+          <header className="admin-toolbar">
+            <div>
+              <h1 className="admin-toolbar__title">{currentSectionLabel}</h1>
+              <p className="admin-toolbar__sub">
+                Management tools for shaping the live ApplianSys storefront.
+              </p>
+            </div>
 
-      <main className="admin-content">
-        <header className="admin-toolbar">
-          <div>
-            <h1 className="admin-toolbar__title">{currentSectionLabel}</h1>
-            <p className="admin-toolbar__sub">
-              Management tools for shaping the live ApplianSys storefront.
-            </p>
-          </div>
+            <div className="admin-toolbar__actions">
+              <span className="admin-chip">
+                {state.settings.maintenanceMode ? "Maintenance mode on" : "Storefront live"}
+              </span>
+              {section === "products" ? (
+                <button
+                  type="button"
+                  className="admin-primary-btn"
+                  onClick={() => setIsProductModalOpen(true)}
+                >
+                  + Add Product
+                </button>
+              ) : null}
+              {section === "products" && user.role === "admin" ? (
+                <button
+                  type="button"
+                  className="admin-secondary-btn"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                >
+                  Add Category
+                </button>
+              ) : null}
+            </div>
+          </header>
 
-          <div className="admin-toolbar__actions">
-            <span className="admin-chip">
-              {state.settings.maintenanceMode ? "Maintenance mode on" : "Storefront live"}
-            </span>
-            {section === "products" ? (
-              <button
-                type="button"
-                className="admin-primary-btn"
-                onClick={() => setIsProductModalOpen(true)}
-              >
-                + Add Product
-              </button>
-            ) : null}
-            {section === "products" && user.role === "admin" ? (
-              <button
-                type="button"
-                className="admin-secondary-btn"
-                onClick={() => setIsCategoryModalOpen(true)}
-              >
-                Add Category
-              </button>
-            ) : null}
-          </div>
-        </header>
+          {state.errorMessage ? (
+            <div className="admin-note" style={{ marginBottom: 18 }}>
+              {state.errorMessage}
+            </div>
+          ) : null}
 
-        {state.errorMessage ? (
-          <div className="admin-note" style={{ marginBottom: 18 }}>
-            {state.errorMessage}
-          </div>
-        ) : null}
+          {state.isLoading ? (
+            <div className="admin-note" style={{ marginBottom: 18 }}>
+              Loading admin data...
+            </div>
+          ) : null}
 
-        {state.isLoading ? (
-          <div className="admin-note" style={{ marginBottom: 18 }}>
-            Loading admin data...
-          </div>
-        ) : null}
+          {renderSectionContent({
+            section,
+            state,
+            onEditProduct: (id) => {
+              state.handleEditProduct(id);
+              setIsProductModalOpen(true);
+            },
+          })}
 
-        {renderSectionContent({ section, state, onEditProduct: (id) => {
-          state.handleEditProduct(id);
-          setIsProductModalOpen(true);
-        } })}
-
-        <CreateProductModal
-          isOpen={isProductModalOpen}
-          onClose={() => {
-            setIsProductModalOpen(false);
-            state.handleCancelEditProduct();
-          }}
-          draft={state.productDraft}
-          setDraft={state.setProductDraft}
-          categories={state.categories}
-          isEditing={state.editingProductId !== null}
-          onAddProduct={state.handleAddProduct}
-          onCancelEdit={state.handleCancelEditProduct}
-        />
-
-        {user.role === "admin" ? (
-          <CategoryManagerModal
-            isOpen={isCategoryModalOpen}
-            onClose={() => setIsCategoryModalOpen(false)}
+          <CreateProductModal
+            isOpen={isProductModalOpen}
+            onClose={() => {
+              setIsProductModalOpen(false);
+              state.handleCancelEditProduct();
+            }}
+            draft={state.productDraft}
+            setDraft={state.setProductDraft}
             categories={state.categories}
-            categoryDraft={state.categoryDraft}
-            setCategoryDraft={state.setCategoryDraft}
-            onAddCategory={state.handleAddCategory}
-            onAddSubSubcategory={state.handleAddSubSubcategory}
-            onDeleteSubcategory={state.handleDeleteSubcategory}
-            onDeleteSubSubcategory={state.handleDeleteSubSubcategory}
+            isEditing={state.editingProductId !== null}
+            onAddProduct={state.handleAddProduct}
+            onCancelEdit={state.handleCancelEditProduct}
           />
-        ) : null}
-      </main>
-    </div>
+
+          {user.role === "admin" ? (
+            <CategoryManagerModal
+              isOpen={isCategoryModalOpen}
+              onClose={() => setIsCategoryModalOpen(false)}
+              categories={state.categories}
+              categoryDraft={state.categoryDraft}
+              setCategoryDraft={state.setCategoryDraft}
+              onAddCategory={state.handleAddCategory}
+              onAddSubSubcategory={state.handleAddSubSubcategory}
+              onDeleteSubcategory={state.handleDeleteSubcategory}
+              onDeleteSubSubcategory={state.handleDeleteSubSubcategory}
+            />
+          ) : null}
+        </main>
+      </div>
+
+      <ConfirmationModal
+        open={Boolean(state.confirmation)}
+        title={state.confirmation?.title ?? ""}
+        message={state.confirmation?.message ?? ""}
+        confirmLabel={state.confirmation?.confirmLabel}
+        variant={state.confirmation?.variant}
+        isBusy={state.isSavingSettings || state.isReleasingPickup}
+        onCancel={state.clearConfirmation}
+        onConfirm={state.confirmAdminAction}
+      />
+    </>
   );
 }
 

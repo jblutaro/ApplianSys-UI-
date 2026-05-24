@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2";
 import { dbPool } from "../../config/database.js";
+import { decryptField } from "../../security/fieldEncryption.js";
 import type { AdminOrder } from "./types.js";
 
 const DELIVERY_STATUSES = new Set(["pending", "processing", "shipped", "delivered", "cancelled"]);
@@ -110,7 +111,7 @@ export async function getOrders(): Promise<AdminOrder[]> {
         id: `ORD-${String(orderId).padStart(4, "0")}`,
         dbId: orderId,
         customer: String(row.customer_name || "Customer"),
-        customerContact: String(row.contact_num || ""),
+        customerContact: decryptField(row.contact_num),
         deliveryMethod: fulfillmentMethod,
         fulfillmentMethod,
         email: String(row.email || ""),

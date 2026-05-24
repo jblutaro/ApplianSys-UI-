@@ -20,6 +20,39 @@ import {
 } from "../../auth/users.js";
 import { AuthServiceError } from "./errors.js";
 
+function validateEmail(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+
+  if (!isValidEmail || normalizedEmail.length > 254) {
+    throw new AuthServiceError(400, "A valid email address is required.");
+  }
+
+  return normalizedEmail;
+}
+
+function validatePasswordPolicy(password: string) {
+  const hasLowercase = /[a-z]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+  if (password.length < 10 || !hasLowercase || !hasUppercase || !hasNumber || !hasSymbol) {
+    throw new AuthServiceError(
+      400,
+      "Password must be at least 10 characters and include uppercase, lowercase, number, and symbol characters.",
+    );
+  }
+}
+
+function validateProfileText(value: string, label: string, maxLength: number) {
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) {
+    throw new AuthServiceError(400, `${label} must be ${maxLength} characters or fewer.`);
+  }
+  return trimmed;
+}
+
 export async function getAuthenticatedUser(userId: number): Promise<AuthUserRow | null> {
   const user = await findUserById(userId);
   if (!user || !isActiveStatus(user.status)) {
@@ -33,7 +66,7 @@ export async function authenticateLocalUser(
   email: string,
   password: string,
 ): Promise<AuthUserRow> {
-  const user = await findUserByEmail(normalizeEmail(email));
+  const user = await findUserByEmail(validateEmail(email));
   if (!user) {
     throw new AuthServiceError(401, "Invalid email or password.");
   }
@@ -74,16 +107,18 @@ export async function registerLocalUser(
     middleName: string;
   },
 ): Promise<AuthUserRow> {
-  const normalizedEmail = normalizeEmail(email);
+  const normalizedEmail = validateEmail(email);
+  validatePasswordPolicy(password);
+
   const existingUser = await findUserByEmail(normalizedEmail);
   if (existingUser) {
     throw new AuthServiceError(409, "An account with that email already exists.");
   }
 
-  const firstName = profile?.firstName.trim() ?? "";
-  const lastName = profile?.lastName.trim() ?? "";
-  const middleName = profile?.middleName.trim() ?? "";
-  const contactNumber = profile?.contactNumber.trim() ?? "";
+  const firstName = validateProfileText(profile?.firstName ?? "", "First name", 80);
+  const lastName = validateProfileText(profile?.lastName ?? "", "Last name", 80);
+  const middleName = validateProfileText(profile?.middleName ?? "", "Middle name", 80);
+  const contactNumber = validateProfileText(profile?.contactNumber ?? "", "Contact number", 40);
 
   if (!firstName || !lastName) {
     throw new AuthServiceError(400, "First name and last name are required.");
@@ -118,8 +153,8 @@ export async function saveAccountProfile(
 ) {
   const firstName = profile.firstName.trim();
   const lastName = profile.lastName.trim();
-  const middleName = profile.middleName.trim();
-  const contactNumber = profile.contactNumber.trim();
+  const middleName = validateProfileText(profile.middleName, "Middle name", 80);
+  const contactNumber = validateProfileText(profile.contactNumber, "Contact number", 40);
 
   if (!firstName || !lastName) {
     throw new AuthServiceError(400, "First name and last name are required.");
@@ -144,9 +179,7 @@ export async function changeAccountPassword(
     throw new AuthServiceError(400, "Current password and new password are required.");
   }
 
-  if (newPassword.length < 8) {
-    throw new AuthServiceError(400, "New password must be at least 8 characters.");
-  }
+  validatePasswordPolicy(newPassword);
 
   const user = await findUserById(userId);
   if (!user || !isActiveStatus(user.status)) {
@@ -171,4 +204,29 @@ export async function changeAccountPassword(
 
   const passwordHash = await hashPassword(newPassword);
   await updateUserPassword(user.user_id, passwordHash);
+}
+
+export async function verifyCurrentPassword(userId: number, currentPassword: string) {
+  if (!currentPassword) {
+    throw new AuthServiceError(400, "Current password is required.");
+  }
+
+  const user = await findUserById(userId);
+  if (!user || !isActiveStatus(user.status)) {
+    throw new AuthServiceError(401, "Authentication required.");
+  }
+
+  let isValidPassword = await verifyPassword(currentPassword, user.password);
+  if (!isValidPassword) {
+    const canUpgradeLegacySeed =
+      user.password === LEGACY_SEEDED_PASSWORD_MARKER &&
+      currentPassword === SEEDED_USER_PASSWORD;
+    const canUpgradePlaintext = isLegacyPlaintextPassword(currentPassword, user.password);
+
+    isValidPassword = canUpgradeLegacySeed || canUpgradePlaintext;
+  }
+
+  if (!isValidPassword) {
+    throw new AuthServiceError(401, "Current password is incorrect.");
+  }
 }

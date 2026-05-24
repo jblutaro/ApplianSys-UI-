@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { dbPool } from "../../config/database.js";
 import { readAdminSettings } from "../../data/adminSettingsStore.js";
+import { encryptField } from "../../security/fieldEncryption.js";
 import type { CartItemRow } from "../cart/cart.js";
 import { getCartItems } from "../cart/cart.js";
 
@@ -23,6 +24,7 @@ export type CheckoutPickupInput = {
 export type CheckoutInput = {
   fulfillment: CheckoutDeliveryInput | CheckoutPickupInput;
   paymentMethod: string;
+  productIds?: number[];
 };
 
 export type PlacedOrder = {
@@ -216,7 +218,10 @@ export async function placeOrder(
     };
   }
 
-  const cartItems = await getCartItems(userId);
+  const cartItems = (await getCartItems(userId)).filter((item) => {
+    if (input.productIds === undefined) return true;
+    return input.productIds.includes(item.productId);
+  });
   if (cartItems.length === 0) {
     return { ok: false, reason: "empty_cart", message: "Your cart is empty." };
   }
@@ -313,7 +318,7 @@ export async function placeOrder(
           deliveryFee,
           estimatedDateStr,
           "pending",
-          addressStr,
+          encryptField(addressStr),
           f.latitude ?? null,
           f.longitude ?? null,
         ],
@@ -358,10 +363,19 @@ export async function placeOrder(
       [userId],
     );
     if (cartRows[0]) {
-      await connection.query(
-        "DELETE FROM CART_ITEM WHERE cart_id = ?",
-        [cartRows[0].cart_id],
-      );
+      if (input.productIds !== undefined) {
+        await connection.query(
+          `DELETE FROM CART_ITEM
+           WHERE cart_id = ?
+             AND product_id IN (${input.productIds.map(() => "?").join(",")})`,
+          [cartRows[0].cart_id, ...input.productIds],
+        );
+      } else {
+        await connection.query(
+          "DELETE FROM CART_ITEM WHERE cart_id = ?",
+          [cartRows[0].cart_id],
+        );
+      }
     }
 
     await connection.commit();

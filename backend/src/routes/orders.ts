@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { readSession } from "../auth/session.js";
 import { findUserById, isActiveStatus, isStaffOrAdminUser } from "../auth/users.js";
+import { logAuditEvent } from "../services/audit/auditLog.js";
 import { cancelCustomerOrder, getCustomerOrders } from "../services/orders/orders.js";
 
 export const ordersRouter = Router();
 
 async function resolveCustomerUserId(req: Parameters<typeof readSession>[0]) {
-  const session = readSession(req);
+  const session = await readSession(req);
   if (!session) return null;
 
   const user = await findUserById(session.userId);
@@ -52,6 +53,13 @@ ordersRouter.post("/:orderId/cancel", async (req, res, next) => {
     }
 
     const orders = await getCustomerOrders(userId);
+    await logAuditEvent({
+      action: "customer.order.cancel",
+      actorId: userId,
+      entityId: orderId,
+      entityType: "order",
+      req,
+    });
     res.json({ ok: true, orders });
   } catch (error) {
     next(error);

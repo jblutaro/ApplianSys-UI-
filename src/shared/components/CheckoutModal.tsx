@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { CartItem } from "@/shared/lib/cartApi";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import {
   fetchCheckoutSettings,
   submitCheckout,
@@ -166,6 +167,10 @@ function createMockGcashSessionId() {
   return `mock-gcash-${values[0].toString(16)}-${values[1].toString(16)}`;
 }
 
+function getSelectedProductIds(items: CartItem[]) {
+  return items.map((item) => item.productId);
+}
+
 async function reverseGeocodeLocation(lat: number, lng: number): Promise<Partial<AddressForm>> {
   const response = await fetch(
     `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
@@ -291,6 +296,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
   const [submitError, setSubmitError] = useState("");
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [gcashPaymentReview, setGcashPaymentReview] = useState<GcashPaymentReview | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"gcash" | "place-order" | null>(null);
   const mockGcashSessionIdRef = useRef<string | null>(null);
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -471,6 +477,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
         createdAt: new Date().toISOString(),
         fulfillment: buildFulfillment(),
         paymentMethod: "GCash",
+        productIds: getSelectedProductIds(items),
         sessionId,
         shipping,
         subtotal,
@@ -499,7 +506,11 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const order = await submitCheckout({ fulfillment: buildFulfillment(), paymentMethod });
+      const order = await submitCheckout({
+        fulfillment: buildFulfillment(),
+        paymentMethod,
+        productIds: getSelectedProductIds(items),
+      });
       setPlacedOrder(order);
       onSuccess();
       if (paymentMethod === "Cash on Delivery" || paymentMethod === "Pay on Pick Up") {
@@ -940,7 +951,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 disabled={step === 2 && !canProceedStep2}
                 onClick={() => {
                   if (step === 2 && paymentMethod === "GCash") {
-                    openMockGcashGateway();
+                    setConfirmAction("gcash");
                     return;
                   }
 
@@ -978,7 +989,7 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
                 type="button"
                 className="checkout-btn-next"
                 disabled={submitting}
-                onClick={() => void handlePlaceOrder()}
+                onClick={() => setConfirmAction("place-order")}
               >
                 {submitting ? (
                   <><div className="checkout-spinner" /> Placing Order...</>
@@ -995,6 +1006,29 @@ export function CheckoutModal({ items, onClose, onSuccess }: Props) {
           </div>
         )}
       </div>
+      <ConfirmationModal
+        open={confirmAction !== null}
+        title={confirmAction === "gcash" ? "Continue to GCash payment?" : "Place this order?"}
+        message={
+          confirmAction === "gcash"
+            ? `You are about to open the mock GCash gateway for ${formatCurrency(total)}. Review your selected items and delivery details before continuing.`
+            : `This will place an order for ${formatCurrency(total)} using ${paymentMethod}. Please confirm that the selected items, quantity, and fulfillment details are correct.`
+        }
+        confirmLabel={confirmAction === "gcash" ? "Open GCash" : "Place Order"}
+        isBusy={submitting}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          const action = confirmAction;
+          setConfirmAction(null);
+          if (action === "gcash") {
+            openMockGcashGateway();
+            return;
+          }
+          if (action === "place-order") {
+            void handlePlaceOrder();
+          }
+        }}
+      />
     </div>
   );
 }

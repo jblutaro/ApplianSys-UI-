@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2";
 import { dbPool } from "../../config/database.js";
+import { decryptField } from "../../security/fieldEncryption.js";
 import { ensureCheckoutSchema } from "../checkout/checkout.js";
 
 export type PickupReleaseOrder = {
@@ -94,7 +95,7 @@ export async function getPendingPickupReleaseOrders(): Promise<PickupReleaseOrde
         orderId,
         orderRef: `ORD-${String(orderId).padStart(4, "0")}`,
         customerName: String(row.customer_name || "Customer"),
-        customerContact: String(row.contact_num || ""),
+        customerContact: decryptField(row.contact_num),
         items: [],
         totalAmount: Number(row.total_amount),
         paymentMethod: normalizePaymentMethod(row.payment_method),

@@ -129,14 +129,104 @@ export type DashboardPayload = {
   itemSales: ItemSalesRow[];
 };
 
+const MUTATING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
+const CSRF_COOKIE = "appliansys_csrf";
+const STEP_UP_CODE = "STEP_UP_REQUIRED";
+
+function readCookie(name: string) {
+  const cookies = document.cookie ? document.cookie.split(";") : [];
+
+  for (const cookie of cookies) {
+    const [rawName, ...rawValue] = cookie.trim().split("=");
+    if (rawName === name) {
+      return rawValue.join("=");
+    }
+  }
+
+  return "";
+}
+
+function withCsrfHeader(init?: RequestInit) {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (!MUTATING_METHODS.has(method)) {
+    return init?.headers ?? {};
+  }
+
+  const csrfToken = readCookie(CSRF_COOKIE);
+  return {
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    ...(init?.headers ?? {}),
+  };
+}
+
 async function request<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
+  const response = await sendRequest(input, init);
+
+  if (response.status === 403) {
+    const retry = await handleStepUpChallenge(response);
+    if (retry) {
+      const retryResponse = await sendRequest(input, init);
+      return parseResponse<T>(retryResponse);
+    }
+  }
+
+  return parseResponse<T>(response);
+}
+
+async function sendRequest(input: string, init?: RequestInit) {
+  return fetch(input, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
+      ...withCsrfHeader(init),
     },
     ...init,
+  });
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as { message?: string };
+      throw new Error(payload.message || "Request failed");
+    }
+
+    const body = await response.text();
+    throw new Error(body || "Request failed");
+  }
+
+  return response.json() as unknown as Promise<T>;
+}
+
+async function handleStepUpChallenge(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return false;
+
+  const payload = (await response.json()) as { code?: string; message?: string };
+  if (payload.code !== STEP_UP_CODE) {
+    throw new Error(payload.message || "Request failed");
+  }
+
+  const currentPassword = window.prompt("Confirm your password to continue this admin action.");
+  if (!currentPassword) {
+    throw new Error("Password confirmation was cancelled.");
+  }
+
+  await confirmAdminStepUp(currentPassword);
+  return true;
+}
+
+async function confirmAdminStepUp(currentPassword: string) {
+  const response = await fetch("/api/auth/step-up/confirm", {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...withCsrfHeader({ method: "POST" }),
+    },
+    method: "POST",
+    body: JSON.stringify({ currentPassword }),
   });
 
   if (!response.ok) {
@@ -151,7 +241,7 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
     throw new Error(body || "Request failed");
   }
 
-  return response.json() as unknown as Promise<T>;
+  await response.json();
 }
 
 export async function fetchAdminDashboard(period: ReportPeriod) {

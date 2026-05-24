@@ -12,7 +12,7 @@ chatRouter.post("/", async (req, res, next) => {
     if (!isChatMessageArray(messages) || messages.length === 0) {
       res.status(400).json({
         ok: false,
-        message: "A non-empty messages array is required.",
+        message: "A non-empty messages array with bounded message lengths is required.",
       });
       return;
     }

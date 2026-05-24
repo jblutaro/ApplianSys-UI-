@@ -11,7 +11,16 @@ function readNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readBoolean(value: string | undefined, fallback: boolean) {
+  if (value === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
 export const env = {
+  nodeEnv: process.env.NODE_ENV ?? "development",
+  allowedOrigins: process.env.ALLOWED_ORIGINS ?? "",
+  enableDbTestRoute: readBoolean(process.env.ENABLE_DB_TEST_ROUTE, false),
+  fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? "",
   adminEmails: process.env.ADMIN_EMAILS ?? process.env.VITE_ADMIN_EMAILS ?? "",
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
@@ -21,4 +30,6 @@ export const env = {
   dbName: process.env.DB_NAME ?? "appliansys_db",
   dbUser: process.env.DB_USER ?? "root",
   dbPassword: process.env.DB_PASSWORD ?? "",
+  dbConnectionLimit: readNumber(process.env.DB_CONNECTION_LIMIT, 10),
+  requestTimeoutMs: readNumber(process.env.REQUEST_TIMEOUT_MS, 15_000),
 };

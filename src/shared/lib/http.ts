@@ -2,12 +2,41 @@ type ErrorPayload = {
   message?: string;
 };
 
+const MUTATING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
+const CSRF_COOKIE = "appliansys_csrf";
+
+function readCookie(name: string) {
+  const cookies = document.cookie ? document.cookie.split(";") : [];
+
+  for (const cookie of cookies) {
+    const [rawName, ...rawValue] = cookie.trim().split("=");
+    if (rawName === name) {
+      return rawValue.join("=");
+    }
+  }
+
+  return "";
+}
+
+function withCsrfHeader(init?: RequestInit) {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (!MUTATING_METHODS.has(method)) {
+    return init?.headers ?? {};
+  }
+
+  const csrfToken = readCookie(CSRF_COOKIE);
+  return {
+    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    ...(init?.headers ?? {}),
+  };
+}
+
 export async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
+      ...withCsrfHeader(init),
     },
     ...init,
   });
@@ -48,4 +77,3 @@ export async function requestJsonPublic<T>(input: string, init?: RequestInit): P
 
   return response.json() as Promise<T>;
 }
-

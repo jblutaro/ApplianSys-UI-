@@ -31,6 +31,14 @@ type UseAdminDashboardOptions = {
   enabled: boolean;
 };
 
+type AdminConfirmation = {
+  confirmLabel?: string;
+  message: string;
+  onConfirm: () => void;
+  title: string;
+  variant?: "danger" | "default";
+};
+
 export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -53,6 +61,13 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
   const [errorMessage, setErrorMessage] = useState("");
   const [productDraft, setProductDraft] = useState<Product>(EMPTY_PRODUCT_DRAFT);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<AdminConfirmation | null>(null);
+
+  const confirmAdminAction = () => {
+    const action = confirmation?.onConfirm;
+    setConfirmation(null);
+    action?.();
+  };
 
   useEffect(() => {
     if (!enabled) return;
@@ -166,25 +181,41 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
   };
 
   const handleDeleteSubcategory = (subcategoryId: number) => {
-    void (async () => {
-      try {
-        const response = await deleteSubcategory(subcategoryId);
-        setCategories(response.categories);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to delete subcategory.");
-      }
-    })();
+    setConfirmation({
+      title: "Delete subcategory?",
+      message: "This action cannot be undone if it succeeds.",
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: () => {
+        void (async () => {
+          try {
+            const response = await deleteSubcategory(subcategoryId);
+            setCategories(response.categories);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to delete subcategory.");
+          }
+        })();
+      },
+    });
   };
 
   const handleDeleteSubSubcategory = (subSubcategoryId: number) => {
-    void (async () => {
-      try {
-        const response = await deleteSubSubcategory(subSubcategoryId);
-        setCategories(response.categories);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to delete sub-subcategory.");
-      }
-    })();
+    setConfirmation({
+      title: "Delete sub-subcategory?",
+      message: "This action cannot be undone if it succeeds.",
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: () => {
+        void (async () => {
+          try {
+            const response = await deleteSubSubcategory(subSubcategoryId);
+            setCategories(response.categories);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to delete sub-subcategory.");
+          }
+        })();
+      },
+    });
   };
 
   const handleEditProduct = (id: string) => {
@@ -204,75 +235,107 @@ export function useAdminDashboard({ enabled }: UseAdminDashboardOptions) {
     const product = products.find((item) => item.id === id);
     if (!product) return;
 
-    void (async () => {
-      try {
-        const response = await deleteProduct(product.dbId);
-        setProducts(response.products);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to delete product.");
-      }
-    })();
+    setConfirmation({
+      title: `Delete ${product.name}?`,
+      message: "This action cannot be undone if it succeeds.",
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: () => {
+        void (async () => {
+          try {
+            const response = await deleteProduct(product.dbId);
+            setProducts(response.products);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to delete product.");
+          }
+        })();
+      },
+    });
   };
 
   const handleOrderStatusChange = (id: string, status: OrderStatus) => {
     const order = orders.find((item) => item.id === id);
     if (!order) return;
 
-    void (async () => {
-      try {
-        const response = await patchOrderStatus(order.dbId, status);
-        setOrders(response.orders);
-        const pickupResponse = await fetchPickupReleaseOrders();
-        setPickupReleaseOrders(pickupResponse.orders);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to update order status.");
-      }
-    })();
+    setConfirmation({
+      title: "Change order status?",
+      message: `Change ${order.id} status to ${status.replace(/_/g, " ")}?`,
+      confirmLabel: "Update status",
+      onConfirm: () => {
+        void (async () => {
+          try {
+            const response = await patchOrderStatus(order.dbId, status);
+            setOrders(response.orders);
+            const pickupResponse = await fetchPickupReleaseOrders();
+            setPickupReleaseOrders(pickupResponse.orders);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to update order status.");
+          }
+        })();
+      },
+    });
   };
 
   const handleSaveSettings = () => {
-    void (async () => {
-      setIsSavingSettings(true);
+    setConfirmation({
+      title: "Save platform settings?",
+      message: "These changes affect the storefront.",
+      confirmLabel: "Save settings",
+      onConfirm: () => {
+        void (async () => {
+          setIsSavingSettings(true);
 
-      try {
-        const response = await updateAdminSettings(settings);
-        setSettings(response.settings);
+          try {
+            const response = await updateAdminSettings(settings);
+            setSettings(response.settings);
 
-        const reportResponse = await fetchSalesReport(period);
-        setReportRows(reportResponse.report);
-        setItemSalesRows(reportResponse.itemSales);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to save settings.");
-      } finally {
-        setIsSavingSettings(false);
-      }
-    })();
+            const reportResponse = await fetchSalesReport(period);
+            setReportRows(reportResponse.report);
+            setItemSalesRows(reportResponse.itemSales);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to save settings.");
+          } finally {
+            setIsSavingSettings(false);
+          }
+        })();
+      },
+    });
   };
 
   const handleReleasePickupOrder = (
     orderId: number,
     confirmPaymentReceived: boolean,
   ) => {
-    void (async () => {
-      setIsReleasingPickup(true);
-      setErrorMessage("");
+    setConfirmation({
+      title: `Release pickup order ORD-${String(orderId).padStart(4, "0")}?`,
+      message: "Confirm the customer and payment details are correct.",
+      confirmLabel: "Release order",
+      onConfirm: () => {
+        void (async () => {
+          setIsReleasingPickup(true);
+          setErrorMessage("");
 
-      try {
-        const response = await releasePickupOrder(orderId, confirmPaymentReceived);
-        setPickupReleaseOrders(response.orders);
-        const dashboardResponse = await fetchAdminDashboard(period);
-        setOrders(dashboardResponse.dashboard.orders);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to release pickup order.");
-      } finally {
-        setIsReleasingPickup(false);
-      }
-    })();
+          try {
+            const response = await releasePickupOrder(orderId, confirmPaymentReceived);
+            setPickupReleaseOrders(response.orders);
+            const dashboardResponse = await fetchAdminDashboard(period);
+            setOrders(dashboardResponse.dashboard.orders);
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to release pickup order.");
+          } finally {
+            setIsReleasingPickup(false);
+          }
+        })();
+      },
+    });
   };
 
   return {
     categories,
     categoryDraft,
+    clearConfirmation: () => setConfirmation(null),
+    confirmAdminAction,
+    confirmation,
     errorMessage,
     handleAddCategory,
     handleAddSubSubcategory,

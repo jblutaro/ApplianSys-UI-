@@ -17,6 +17,7 @@ export type FulfillmentPickup = {
 export type CheckoutPayload = {
   fulfillment: FulfillmentDelivery | FulfillmentPickup;
   paymentMethod: string;
+  productIds?: number[];
 };
 
 export type PlacedOrder = {
